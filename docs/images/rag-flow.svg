@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 250" width="980" height="250" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"><title>RAG flow: question, lexical and semantic search, rerank, top passages, prompt, local model, answer with sources</title><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4da3ff"/></marker></defs><rect x="0" y="0" width="980" height="250" rx="14" fill="#0f1115"/>
+      <g font-size="12" text-anchor="middle">
+        <rect x="10" y="100" width="120" height="50" rx="8" fill="#1d2330"/><text x="70" y="122" fill="#e6e6e6">your question</text><text x="70" y="138" fill="#9aa0ad" font-size="10.5">"¿Quién era Zelomi?"</text>
+        <rect x="170" y="40" width="160" height="50" rx="8" fill="#1d3a5c"/><text x="250" y="62" fill="#e6e6e6">lexical (TF-IDF)</text><text x="250" y="78" fill="#9aa0ad" font-size="10.5">shared words</text>
+        <rect x="170" y="160" width="160" height="50" rx="8" fill="#1d4a3a"/><text x="250" y="182" fill="#e6e6e6">semantic (embeddings)</text><text x="250" y="198" fill="#9aa0ad" font-size="10.5">similar meaning</text>
+        <rect x="370" y="100" width="130" height="50" rx="8" fill="#4a3a1d"/><text x="435" y="122" fill="#e6e6e6">rerank</text><text x="435" y="138" fill="#9aa0ad" font-size="10.5">careful re-score</text>
+        <g>
+          <rect x="540" y="78" width="130" height="94" rx="8" fill="#171a21" stroke="#2a2e3a"/>
+          <text x="605" y="96" fill="#9aa0ad" font-size="10.5">top 3 passages</text>
+          <rect x="552" y="104" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+          <rect x="552" y="125" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+          <rect x="552" y="146" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+        </g>
+        <rect x="710" y="100" width="120" height="50" rx="8" fill="#171a21" stroke="#4da3ff"/><text x="770" y="122" fill="#4da3ff">local model</text><text x="770" y="138" fill="#9aa0ad" font-size="10.5">reads + writes</text>
+        <rect x="860" y="85" width="110" height="80" rx="8" fill="#0f1a12" stroke="#34c759"/><text x="915" y="112" fill="#e6e6e6">answer</text><text x="915" y="130" fill="#34c759" font-size="10.5">+ sources</text><text x="915" y="148" fill="#9aa0ad" font-size="10">or "not in the docs"</text>
+      </g>
+      <g fill="none" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)">
+        <path d="M130 118 L166 70"/><path d="M130 132 L166 180"/><path d="M332 65 L368 115"/><path d="M332 185 L368 135"/><line x1="502" y1="125" x2="536" y2="125"/><line x1="672" y1="125" x2="706" y2="125"/><line x1="832" y1="125" x2="856" y2="125"/>
+      </g>
+      <text x="490" y="235" fill="#9aa0ad" font-size="11.5" text-anchor="middle">All of this happens for every question, in a few seconds; then the model spends most of the time writing the answer.</text>
+    </svg>

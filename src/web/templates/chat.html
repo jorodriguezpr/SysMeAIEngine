@@ -1,0 +1,139 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Chat · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Chat</h1>
+
+<div class="card">
+  <div class="row">
+    <label>Model
+      <select id="model">
+        {% for m in models %}
+        <option value="{{ m.name }}" {% if m.name == loaded %}selected{% endif %}>{{ m.name }} ({{ m.provider }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <span class="pill {% if loaded %}ok{% endif %}">loaded: {{ loaded or "none" }}</span>
+    <button onclick="loadSelected()">Load</button>
+    <span class="muted">endpoint: <code>/v1/chat/completions</code></span>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Conversation</h3>
+  <div id="history" style="min-height:200px; max-height:420px; overflow-y:auto; padding:.5rem 0">
+    <div class="muted">No messages yet — say something below.</div>
+  </div>
+  <div class="row" style="margin-top:.6rem">
+    <input id="prompt" placeholder="Ask about the PDF you ingested…" style="flex:1; min-width:280px" onkeydown="if(event.key==='Enter') sendMsg()">
+    <button class="primary" onclick="sendMsg()">Send</button>
+    <button onclick="clearHistory()">Clear</button>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <label class="muted">max_tokens <input id="max_tokens" type="number" value="200" style="width:5em"></label>
+    <label class="muted">temperature <input id="temperature" type="number" step="0.1" value="0.2" style="width:5em"></label>
+    <label class="muted"><input id="rag" type="checkbox" checked> Ground in ingested books (RAG)</label>
+    <label class="muted"><input id="rag_all" type="checkbox"> Search all trained corpora, not just this model's own</label>
+    <label class="muted"><input id="kgraph" type="checkbox" checked> Use knowledge graph facts</label>
+    <label class="muted"><input id="cloud" type="checkbox"> Use cloud AI provider (<a href="/ui/settings">configure</a>)</label>
+  </div>
+</div>
+
+<script>
+let messages = [];
+
+function addMsg(role, text){
+  messages.push({role, content: text});
+  render();
+}
+function render(){
+  const h = document.getElementById('history');
+  h.innerHTML = '';
+  if(messages.length === 0){
+    h.innerHTML = '<div class="muted">No messages yet — say something below.</div>';
+    return;
+  }
+  for(const m of messages){
+    const div = document.createElement('div');
+    div.style.margin = '.4rem 0';
+    div.innerHTML = '<b style="color:' + (m.role === 'user' ? '#4da3ff' : '#34c759') + '">' + m.role + '</b>: ' + escapeHtml(m.content);
+    h.appendChild(div);
+  }
+  h.scrollTop = h.scrollHeight;
+}
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+async function sendMsg(){
+  const promptEl = document.getElementById('prompt');
+  const prompt = promptEl.value.trim();
+  if(!prompt) return;
+  promptEl.value = '';
+  addMsg('user', prompt);
+  addMsg('assistant', '…thinking…');
+  const useRag = document.getElementById('rag').checked;
+  const searchAll = document.getElementById('rag_all').checked;
+  const useKgraph = document.getElementById('kgraph').checked;
+  const useCloud = document.getElementById('cloud').checked;
+  const model = document.getElementById('model').value;
+  const max_tokens = parseInt(document.getElementById('max_tokens').value);
+  const temperature = parseFloat(document.getElementById('temperature').value);
+  // /v1/chat/completions (OpenAI-compatible) has no cloud-provider wiring --
+  // /api/chat does, so route there instead whenever cloud is requested.
+  const url = useRag ? '/api/rag/chat' : (useCloud ? '/api/chat' : '/v1/chat/completions');
+  const usesTextShape = useRag || useCloud;
+  const body = useRag
+    ? { model, prompt, max_new_tokens: max_tokens, temperature, use_cloud: useCloud, use_kgraph: useKgraph, ...(searchAll ? {corpus: 'all'} : {}) }
+    : useCloud
+      ? { model, prompt, max_new_tokens: max_tokens, temperature, use_cloud: true, chat_mode: 'grounded', top_k: 6 }
+      : { model, messages, max_tokens, temperature };
+  try{
+    const r = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    let text = usesTextShape ? (j.text || j.detail || JSON.stringify(j)) : (j.choices?.[0]?.message?.content || j.detail || JSON.stringify(j));
+    if(j.sources?.length){
+      text += '\n\n[sources: ' + j.sources.map(s => `${s.corpus}/${s.source} (${s.score.toFixed(2)})`).join(', ') + ']';
+    }
+    if(j.model && (j.model.startsWith('cloud:') || j.model.startsWith('grounded:cloud:'))){
+      text += `\n\n[answered by ${j.model.replace(/^(grounded:)?cloud:/, '')}]`;
+    }
+    if(j.grounding?.fallback) text += `\n[${j.grounding.fallback}]`;
+    messages.pop(); addMsg('assistant', text);
+  }catch(e){
+    messages.pop(); addMsg('assistant', 'ERR ' + e);
+  }
+}
+function clearHistory(){ messages = []; render(); }
+async function loadSelected(){
+  const name = document.getElementById('model').value;
+  const r = await fetch('/api/models/load', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  const j = await r.json();
+  location.reload();
+}
+</script>
+{% endblock %}

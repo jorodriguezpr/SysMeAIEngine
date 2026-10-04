@@ -1,0 +1,180 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Self-Learning Agent · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Self-Learning Agent</h1>
+
+<div class="card">
+  <h3>Run agent
+    <span id="status-pill" class="pill {% if agent.status == 'running' %}ok{% endif %}" style="margin-left:.5rem">
+      {{ agent.status }}{% if agent.current_topic %}: {{ agent.current_topic }}{% endif %}
+    </span>
+  </h3>
+  <div class="row">
+    <input id="topic" placeholder="topic to research" style="flex:1; min-width:260px">
+    <label class="muted">pages <input id="max_pages" type="number" style="width:5em" value="{{ config.agent_max_pages }}"></label>
+    <label class="muted">depth
+      <select id="max_depth">
+        <option value="1" selected>1 (search results only)</option>
+        <option value="2">2 (follow a few in-page links)</option>
+        <option value="3">3 (follow links two levels deep)</option>
+      </select>
+    </label>
+    <label class="muted">links/page <input id="links_per_page" type="number" style="width:4em" value="3"></label>
+    <button class="primary" id="run-btn" onclick="runAgent()" {% if agent.status == 'running' %}disabled{% endif %}>Search + ingest</button>
+  </div>
+  <p class="muted">
+    The agent queries DuckDuckGo, scrapes allowlisted pages (PDF/Word/PowerPoint/Excel links are
+    extracted properly too, not misread as HTML), saves each page under
+    <code>{{ config.raw_dir }}\agent\&lt;topic&gt;</code>, and updates the queue.
+    With depth &gt; 1 it also follows a few links found on each page (same domain by default,
+    or governed by the allowlist below if one is set) — bounded by "pages", the total scrape budget.
+    Trigger training manually after review.
+  </p>
+  <p class="muted">Allowlist: {% if config.agent_allowlist %}{{ config.agent_allowlist | join(", ") }}{% else %}<em>not set (allowing all)</em>{% endif %}</p>
+  <div id="live-log-wrap" style="display:{% if agent.status == 'running' %}block{% else %}none{% endif %}; margin-top:.75rem">
+    <h3 style="margin-bottom:.3rem">Live progress</h3>
+    <pre id="live-log">(starting…)</pre>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Agent state</h3>
+  <table>
+    <tr><th style="width:140px">Last topic</th><td>{{ agent.last_topic or "—" }}</td></tr>
+    <tr><th>Last run</th><td>{{ agent.last_run_at or "—" }}</td></tr>
+    <tr><th>Files written</th><td>{{ agent.last_results }}</td></tr>
+    <tr><th>Scraped to</th><td class="muted">{{ agent.last_out_dir or "—" }}</td></tr>
+  </table>
+  {% if agent.last_files %}
+  <ul>{% for f in agent.last_files %}<li class="muted">{{ f }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if agent.last_out_dir %}
+  <div class="row" style="margin-top:.75rem">
+    <input type="hidden" id="train_source_dir" value="{{ agent.last_out_dir }}">
+    <input id="train_job_name" value="agent-{{ agent.last_topic | default('scrape', true) | lower | replace(' ', '-') }}" style="width:16em">
+    <button class="primary" id="train-btn" onclick="trainOnScraped()" {% if agent.status == 'running' %}disabled{% endif %}>Train on scraped content</button>
+  </div>
+  <p class="muted" style="margin-top:.4rem">
+    Trains a model on <code>{{ agent.last_out_dir }}</code> (this run's scraped pages only) using the same
+    pipeline as <a href="/ui/train-folder">Train from Folder</a> — fine-tune, register, and a hybrid RAG
+    index, all in one job. Nothing is trained automatically; this is the explicit trigger.
+  </p>
+  <div id="train-result" class="muted" style="margin-top:.4rem"></div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>History</h3>
+  <table>
+    <thead><tr><th>At</th><th>Topic</th><th>Files</th><th>Scraped to</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for h in agent.history %}
+      <tr>
+        <td class="muted">{{ h.at }}</td>
+        <td>{{ h.topic }}</td>
+        <td>{{ h.files | length if h.files else 0 }}</td>
+        <td class="muted" style="font-size:.8rem">{{ h.out_dir or "—" }}</td>
+        <td>{% if h.error %}<span class="pill bad">{{ h.error }}</span>{% else %}rc={{ h.rc }}{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No runs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+let pollTimer = null;
+
+async function runAgent(){
+  const topic = document.getElementById('topic').value;
+  const max_pages = parseInt(document.getElementById('max_pages').value);
+  const max_depth = parseInt(document.getElementById('max_depth').value);
+  const links_per_page = parseInt(document.getElementById('links_per_page').value);
+  const r = await fetch('/api/agent/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({topic, max_pages, max_depth, links_per_page})});
+  const j = await r.json();
+  if(!r.ok){ alert('ERR ' + (j.detail || r.statusText)); return; }
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('status-pill').textContent = 'running: ' + topic;
+  document.getElementById('status-pill').classList.add('ok');
+  document.getElementById('live-log-wrap').style.display = 'block';
+  document.getElementById('live-log').textContent = '(starting…)';
+  startPolling();
+}
+
+async function pollOnce(){
+  const r = await fetch('/api/agent/log');
+  const j = await r.json();
+  if(j.log !== null){
+    const el = document.getElementById('live-log');
+    el.textContent = j.log;
+    el.scrollTop = el.scrollHeight;
+  }
+  if(j.status !== 'running'){
+    stopPolling();
+    document.getElementById('run-btn').disabled = false;
+    document.getElementById('status-pill').textContent = 'idle';
+    document.getElementById('status-pill').classList.remove('ok');
+    setTimeout(() => location.reload(), 600); // refresh to show updated history
+  }
+}
+
+async function trainOnScraped(){
+  const source = document.getElementById('train_source_dir').value;
+  const job_name = document.getElementById('train_job_name').value.trim();
+  if(!job_name){ alert('job name required'); return; }
+  document.getElementById('train-btn').disabled = true;
+  document.getElementById('train-result').textContent = 'starting…';
+  try{
+    const r = await fetch('/api/train/from-folder', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({source, job_name})
+    });
+    const j = await r.json();
+    document.getElementById('train-result').innerHTML = r.ok
+      ? `job started (id: ${j.job_id}) — watch progress on <a href="/ui/train-folder">Train from Folder</a>`
+      : 'ERR ' + (j.detail || r.statusText);
+  } finally {
+    document.getElementById('train-btn').disabled = false;
+  }
+}
+
+function startPolling(){
+  if(pollTimer) return;
+  pollOnce();
+  pollTimer = setInterval(pollOnce, 2000);
+}
+function stopPolling(){
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+// resume polling if a run was already in progress when this page loaded
+if('{{ agent.status }}' === 'running'){
+  startPolling();
+}
+</script>
+{% endblock %}

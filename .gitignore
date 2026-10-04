@@ -1,0 +1,28 @@
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Local backups of configuration (the base .env itself is part of the repo)
+.env.*
+!.env.example
+
+# Runtime data: created on first run (config.ensure_layout); never commit
+# documents, indexes, datasets, checkpoints, downloaded models or settings
+data/
+models/
+*.gguf
+*.safetensors
+*.bin
+*.onnx
+
+# Logs and local debris
+*.log
+dxdiag.tmp
+server_*.html
+*.tgz
+*.zip
+
+# Cluster-node transfer package (generated copy of this repo)
+client/

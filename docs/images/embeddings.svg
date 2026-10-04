@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" width="900" height="260" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"><title>Embedding space with meaning clusters</title><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4da3ff"/></marker></defs><rect x="0" y="0" width="900" height="260" rx="14" fill="#0f1115"/>
+      <rect x="10" y="10" width="560" height="240" rx="10" fill="#10131a" stroke="#2a2e3a"/>
+      <g font-size="13">
+        <circle cx="120" cy="70" r="6" fill="#34c759"/><text x="132" y="74" fill="#cfd5df">king · rey</text>
+        <circle cx="150" cy="110" r="6" fill="#34c759"/><text x="162" y="114" fill="#cfd5df">queen · reina</text>
+        <circle cx="95" cy="130" r="6" fill="#34c759"/><text x="40" y="150" fill="#cfd5df">palace · palacio</text>
+        <circle cx="420" cy="190" r="6" fill="#ff9500"/><text x="432" y="194" fill="#cfd5df">bicycle</text>
+        <circle cx="460" cy="160" r="6" fill="#ff9500"/><text x="472" y="164" fill="#cfd5df">car · coche</text>
+        <circle cx="390" cy="225" r="6" fill="#ff9500"/><text x="402" y="229" fill="#cfd5df">train</text>
+        <circle cx="330" cy="70" r="6" fill="#4da3ff"/><text x="342" y="74" fill="#cfd5df">temple · templo</text>
+        <circle cx="370" cy="40" r="6" fill="#4da3ff"/><text x="382" y="44" fill="#cfd5df">priest · sacerdote</text>
+        <circle cx="200" cy="85" r="8" fill="none" stroke="#fff" stroke-width="2"/><text x="212" y="80" fill="#fff" font-weight="600">your question</text>
+        <line x1="200" y1="85" x2="150" y2="110" stroke="#fff" stroke-dasharray="4 3"/>
+        <line x1="200" y1="85" x2="120" y2="70" stroke="#fff" stroke-dasharray="4 3"/>
+      </g>
+      <g font-size="12.5" fill="#9aa0ad">
+        <text x="600" y="50">• Related meanings sit close together,</text>
+        <text x="612" y="68">in any language (multilingual model).</text>
+        <text x="600" y="100">• Your question becomes a point too.</text>
+        <text x="600" y="132">• Search = "which chunks are</text>
+        <text x="612" y="150">nearest to my question?"</text>
+        <text x="600" y="182">• Real embeddings have hundreds of</text>
+        <text x="612" y="200">dimensions; this is a 2-D sketch.</text>
+      </g>
+    </svg>

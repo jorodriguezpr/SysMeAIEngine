@@ -1,0 +1,298 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Train from Folder · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Train from Folder</h1>
+<p class="muted">Point at a folder of documents — PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), or .txt (e.g. pages scraped by the Self-Learning Agent) — it scans them recursively, extracts and chunks the text, builds a training dataset, fine-tunes a model, registers it, and builds a hybrid RAG index over the same source text, all in one job.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>NPU (Ryzen AI)</h3>
+    <div class="big">—</div>
+    <div class="muted">{{ devices.npu.reason }}</div>
+  </div>
+  <div class="card">
+    <h3>GPU (DirectML)</h3>
+    <div class="big">—</div>
+    <div class="muted">{{ devices.gpu_directml.reason }}</div>
+  </div>
+  <div class="card">
+    <h3>System memory</h3>
+    <div class="big">{{ memory.available_gb }} GB free</div>
+    <div class="muted">{{ memory.used_gb }} / {{ memory.total_gb }} GB used ({{ memory.percent }}%) — a rough RAM estimate is checked before each job starts (see "Start a training job" below)</div>
+  </div>
+  <div class="card">
+    <h3>OCR</h3>
+    <div class="big">{{ "on" if ocr.available else "off" }}</div>
+    <div class="muted">{% if ocr.available %}Scanned (image-only) PDF pages and image files (.png/.jpg/.tif/...) are OCR'd via {{ ocr.backend }}; pages with a real text layer are read directly.{% else %}{{ ocr.reason }}{% endif %}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Start a training job</h3>
+  <form id="tf" onsubmit="return startJob(event)">
+    <div class="row">
+      <label>Source folder (scanned recursively for .pdf/.docx/.pptx/.xlsx/.txt{% if ocr.available %}, plus scanned PDFs and images via OCR{% endif %})
+        <input name="source" placeholder="C:\path\to\docs\folder" style="width:22em" required>
+      </label>
+      <label>Job / model name
+        <input name="job_name" placeholder="my-docs" style="width:12em" required>
+      </label>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <label>Base model
+        <select name="base_model">
+          <option value="gpt2" selected>gpt2 (124M — coherent, CPU-practical)</option>
+          <option value="Qwen/Qwen2.5-0.5B-Instruct">qwen2.5-0.5b-instruct (494M — better reasoning, ~40x slower to train — measured, use a small Max rows)</option>
+          <option value="minilm">minilm (TinyGPT toy — fast, byte-level, not for real answers)</option>
+        </select>
+      </label>
+      <label>Dataset format
+        <select name="dataset_format">
+          <option value="lm" selected>lm (plain document training — recommended)</option>
+          <option value="qa">qa (instruction/answer pairs, heuristic-generated)</option>
+          <option value="cloud_qa">cloud_qa (instruction/answer pairs written by your cloud AI provider — needs Settings &gt; Cloud AI provider enabled, costs one API call per chunk)</option>
+        </select>
+      </label>
+      <label>Method
+        <select name="method">
+          <option value="sft" selected>sft (full fine-tune — recommended for these small models)</option>
+          <option value="lora">lora (adapter-only — auto-detects target modules for this architecture)</option>
+        </select>
+      </label>
+      <label>Chunking
+        <select name="chunking">
+          <option value="window" selected>window (fixed character slices — can cut mid-sentence)</option>
+          <option value="structured">structured (packs whole sentences per chunk)</option>
+          <option value="paragraph">paragraph (packs whole paragraphs per chunk — most coherent for RAG retrieval)</option>
+        </select>
+      </label>
+      <label>Epochs <input name="epochs" type="number" value="1" style="width:5em"></label>
+      <label>Max rows <input name="max_rows" type="number" value="2000" style="width:7em"></label>
+      <label title="Tokens per training row -- longer rows are truncated. Preview shows how much that cuts.">Max seq <input name="max_seq" type="number" value="128" min="16" style="width:6em"></label>
+      <button type="button" onclick="previewDataset()">Preview dataset size</button>
+      <button class="primary">Start</button>
+    </div>
+    {% if cluster_nodes %}
+    <div class="row" style="margin-top:.5rem">
+      <label style="width:100%">Distribute fine-tuning across cluster nodes (in addition to this machine)
+        <div>
+        {% for n in cluster_nodes %}
+          <label style="margin-right:1em"><input type="checkbox" name="nodes" value="{{ n.name }}"> {{ n.name }} ({{ n.host }}:{{ n.port }})</label>
+        {% endfor %}
+        </div>
+      </label>
+    </div>
+    <p class="muted" style="margin-top:.25rem">Leave unchecked to train locally on this machine only (unchanged default behavior). Not available with the minilm base model -- see docs/CLUSTER.md.</p>
+    {% endif %}
+  </form>
+  <div id="tf-preview" class="muted" style="margin-top:.5rem"></div>
+  <div id="tf-result" class="muted"></div>
+  <p class="muted" style="margin-top:.5rem">
+    Training always runs on CPU (see the GPU card above for why — DirectML was tried and rejected).
+    Rows beyond "Max rows" are representatively sampled — spread evenly across every source file — so a
+    large folder still finishes in a practical time instead of running for hours.
+    At the default 2000 rows with gpt2, expect roughly an hour on this hardware — measured, not
+    estimated; your mileage will vary by CPU. qwen2.5-0.5b-instruct measured ~41x slower than gpt2
+    per row (0.014 vs 0.575 samples/sec) — at 2000 rows that's over a day, so drop Max rows to
+    50–100 unless you're deliberately running it overnight.
+  </p>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Evaluate a RAG corpus</h3>
+  <p class="muted">Measures whether retrieval finds the right passage, using questions generated from a held-out sample of the corpus's own chunks (no labeled eval set needed). <b>first_sentence</b> queries with a sentence copied from the chunk; <b>keywords</b> with 6 exact words from it (no sentence). Keywords is a <i>lexical</i> test: near-trivial for tfidf, hard for semantic -- measured on aprocrifos-v2: tfidf hit@1 1.00 vs semantic 0.05. Compare methods on the same mode; hit@1/MRR separate results that recall@k scores the same. Optionally also scores a model's RAG-grounded answers (slow: one real generation per question).</p>
+  <form id="ev" onsubmit="return startEval(event)">
+    <div class="row">
+      <label>Corpus <select name="corpus" id="ev-corpus"><option value="">(loading...)</option></select></label>
+      <label>Question mode
+        <select name="question_mode">
+          <option value="keywords" selected>keywords</option>
+          <option value="first_sentence">first_sentence</option>
+        </select>
+      </label>
+      <label>Method
+        <select name="method">
+          <option value="hybrid" selected>hybrid</option>
+          <option value="semantic">semantic</option>
+          <option value="tfidf">tfidf</option>
+        </select>
+      </label>
+      <label>Top k <input name="top_k" type="number" value="5" min="1" style="width:4em"></label>
+      <label>Held-out fraction <input name="held_out_fraction" type="number" value="0.1" step="0.05" min="0.01" max="1" style="width:5em"></label>
+      <label>Also score answers from model <select name="model" id="ev-model"><option value="">(retrieval only)</option></select></label>
+      <button class="primary">Run evaluation</button>
+    </div>
+  </form>
+  <div id="ev-result" class="muted" style="margin-top:.5rem"></div>
+  <pre id="ev-details" style="display:none;max-height:20em;overflow:auto"></pre>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Jobs</h3>
+  <table>
+    <thead><tr><th>Job</th><th>Started</th><th>Status</th><th>Args</th><th>Log</th></tr></thead>
+    <tbody id="jobs-body">
+      {% for j in jobs %}
+      <tr>
+        <td>{{ j.args.job_name }}</td>
+        <td class="muted">{{ j.started_at }}</td>
+        <td>{{ j.status }}{% if j.progress %} <span class="muted">({{ j.progress.percent }}%, step {{ j.progress.current_step }}/{{ j.progress.total_steps }})</span>{% endif %}</td>
+        <td class="muted" style="font-size:.8rem">{{ j.args | tojson }}</td>
+        <td><a href="#" onclick="showLog('{{ j.id }}'); return false">view</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <pre id="joblog" style="display:none"></pre>
+</div>
+
+<script>
+async function previewDataset(){
+  const fd = new FormData(document.getElementById('tf'));
+  const body = {
+    source: fd.get('source'), dataset_format: fd.get('dataset_format'),
+    max_rows: parseInt(fd.get('max_rows')), chunking: fd.get('chunking'),
+    base_model: fd.get('base_model'), max_seq: parseInt(fd.get('max_seq')),
+  };
+  const el = document.getElementById('tf-preview');
+  el.textContent = 'estimating...';
+  const r = await fetch('/api/train/from-folder/preview', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if(!r.ok){ el.textContent = 'ERR ' + (j.detail || r.statusText); return; }
+  let msg = `~${j.estimated_rows} rows, ~${j.estimated_tokens} tokens`;
+  if(j.text_truncated_pct > 0) msg += ` (~${j.estimated_tokens_trained} actually trained after max_seq=${j.max_seq} truncation)`;
+  msg += ` · avg ${j.avg_tokens_per_row} tokens/row · counts: ${j.token_count_method} · ${j.note}`;
+  el.textContent = msg;
+  if(j.truncation_warning){
+    const w = document.createElement('div');
+    w.style.color = 'var(--warn, #b45309)';
+    w.textContent = 'WARNING: ' + j.truncation_warning;
+    el.appendChild(w);
+  }
+}
+async function startJob(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  body.epochs = parseInt(body.epochs);
+  body.max_rows = parseInt(body.max_rows);
+  body.max_seq = parseInt(body.max_seq);
+  body.nodes = fd.getAll('nodes');
+  const r = await fetch('/api/train/from-folder', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  let msg = r.ok ? ('job started: ' + j.job_id) : ('ERR ' + (j.detail || r.statusText));
+  if(r.ok && j.ram_warning) msg = 'WARNING: ' + j.ram_warning + ' — ' + msg;
+  document.getElementById('tf-result').textContent = msg;
+  if(r.ok) setTimeout(()=>location.reload(), 800);
+}
+async function showLog(id){
+  const r = await fetch('/api/train/jobs/' + id + '/log');
+  const j = await r.json();
+  const el = document.getElementById('joblog');
+  el.style.display = 'block';
+  el.textContent = j.log || '(empty)';
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function statusCell(j){
+  let s = j.status;
+  if(j.progress) s += ` <span class="muted">(${j.progress.percent}%, step ${j.progress.current_step}/${j.progress.total_steps})</span>`;
+  return s;
+}
+async function pollJobs(){
+  try{
+    const r = await fetch('/api/train/jobs');
+    const all = await r.json();
+    const jobs = all.filter(j => j.args && j.args.kind === 'pdf_folder');
+    const body = document.getElementById('jobs-body');
+    if(!jobs.length){
+      body.innerHTML = '<tr><td colspan="5" class="muted">No jobs yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = jobs.map(j => `
+      <tr>
+        <td>${escapeHtml(j.args.job_name || '')}</td>
+        <td class="muted">${j.started_at || ''}</td>
+        <td>${statusCell(j)}</td>
+        <td class="muted" style="font-size:.8rem">${escapeHtml(JSON.stringify(j.args))}</td>
+        <td><a href="#" onclick="showLog('${escapeHtml(j.id)}'); return false">view</a></td>
+      </tr>
+    `).join('');
+  }catch(e){ /* transient fetch error -- next poll will retry */ }
+}
+async function loadEvalOptions(){
+  try{
+    const c = await (await fetch('/api/rag/corpora')).json();
+    const sel = document.getElementById('ev-corpus');
+    sel.innerHTML = c.corpora.length
+      ? c.corpora.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
+      : '<option value="">(no RAG corpora built yet)</option>';
+    const m = await (await fetch('/v1/models')).json();
+    document.getElementById('ev-model').innerHTML = '<option value="">(retrieval only)</option>' +
+      m.data.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.id)}</option>`).join('');
+  }catch(e){ /* page still usable; the submit reports real errors */ }
+}
+async function startEval(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    corpus: fd.get('corpus'), question_mode: fd.get('question_mode'), method: fd.get('method'),
+    top_k: parseInt(fd.get('top_k')), held_out_fraction: parseFloat(fd.get('held_out_fraction')),
+  };
+  if(fd.get('model')) body.model = fd.get('model');
+  const out = document.getElementById('ev-result');
+  const det = document.getElementById('ev-details');
+  det.style.display = 'none';
+  out.textContent = 'starting...';
+  const r = await fetch('/api/rag/eval', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if(!r.ok){ out.textContent = 'ERR ' + (j.detail || r.statusText); return; }
+  const t0 = Date.now();
+  while(true){
+    await new Promise(res => setTimeout(res, 2000));
+    const s = await (await fetch('/api/rag/eval/' + j.eval_id)).json();
+    if(s.status === 'running'){ out.textContent = `running... ${Math.round((Date.now()-t0)/1000)}s`; continue; }
+    if(s.status === 'failed'){ out.textContent = 'FAILED: ' + s.error; return; }
+    const rv = s.result.retrieval;
+    const pct = x => (100*x).toFixed(1) + '%';
+    let msg = `${rv.n_evaluated} questions (${rv.question_mode}, ${rv.method}): recall@${rv.top_k} ${pct(rv.recall_at_k)} · hit@1 ${pct(rv.hit_at_1)} · MRR ${rv.mrr.toFixed(3)}`;
+    if(s.result.answers){
+      const a = s.result.answers;
+      msg += ` · answers (${escapeHtml(a.model)}): keyword overlap ${pct(a.avg_keyword_overlap)}, refused ${pct(a.refusal_rate)}`;
+    }
+    out.textContent = msg;
+    det.textContent = JSON.stringify(s.result, null, 2);
+    det.style.display = 'block';
+    return;
+  }
+}
+loadEvalOptions();
+setInterval(pollJobs, 4000);
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}MCP · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>MCP</h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Server</h3>
+    <table>
+      <tr><th>Name</th><td>{{ server_info.name }}</td></tr>
+      <tr><th>Version</th><td>{{ server_info.version }}</td></tr>
+      <tr><th>Protocol</th><td>{{ protocol }}</td></tr>
+      <tr><th>Endpoint</th><td><code>{{ endpoint }}</code></td></tr>
+    </table>
+    <p class="muted">JSON-RPC 2.0 — POST to <code>{{ endpoint }}</code>.</p>
+  </div>
+  <div class="card">
+    <h3>Ping</h3>
+    <button class="primary" onclick="pingMcp()">Ping</button>
+    <pre id="ping-out" style="margin-top:.6rem; display:none"></pre>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Tools</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for t in tools %}
+      <tr><td><code>{{ t.name }}</code></td><td>{{ t.description }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Prompts</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for p in prompts %}
+      <tr><td><code>{{ p.name }}</code></td><td>{{ p.description }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+async function pingMcp(){
+  const r = await fetch('/mcp', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0', id:1, method:'ping'})
+  });
+  const j = await r.json();
+  const el = document.getElementById('ping-out');
+  el.style.display = 'block';
+  el.textContent = JSON.stringify(j, null, 2);
+}
+</script>
+{% endblock %}

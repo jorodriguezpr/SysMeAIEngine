@@ -1,0 +1,139 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Knowledge Graph · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Knowledge Graph</h1>
+<p class="muted">
+  Extracts <em>entities and relations</em> (triples) from your ingested
+  documents with the cloud provider — one API call per indexed chunk — and
+  stores them in a local SQLite graph. Chat grounding (Settings) merges
+  these facts into the retrieved context, so questions like "who is X and
+  what did he do?" can be answered by <em>traversing</em> knowledge, not
+  just finding look-alike passages. Builds are resumable: chunks already in
+  the graph are skipped on rebuild.
+</p>
+
+<div class="card">
+  <h3>Build a graph</h3>
+  <div class="row">
+    <label>Corpus
+      <select id="corpus">
+        {% if buildable %}
+          {% for c in buildable %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        {% else %}
+          <option value="">— no RAG indexes built yet —</option>
+        {% endif %}
+      </select>
+    </label>
+    <label class="muted">max chunks (optional cost cap) <input id="max_chunks" type="number" min="1" style="width:6em" placeholder="all"></label>
+    <button class="primary" onclick="buildGraph()" {% if not buildable %}disabled{% endif %}>Build</button>
+    <span id="status" class="muted"></span>
+  </div>
+  <div id="progress" class="muted" style="margin-top:.5rem"></div>
+</div>
+
+<div class="card">
+  <h3>Built graphs</h3>
+  {% if not graphs %}
+    <p class="muted">No graphs built yet.</p>
+  {% endif %}
+  {% for g in graphs %}
+  <div style="margin:.8rem 0;padding:.6rem;border:1px solid #2a2a3a;border-radius:8px">
+    <strong>{{ g.corpus }}</strong>
+    {% if g.exists %}
+      — {{ g.entities }} entities, {{ g.triples }} triples, {{ g.chunks_covered }} chunks covered
+      {% if g.top_entities %}
+        <div class="muted" style="margin-top:.4rem">Top entities:
+          {% for e in g.top_entities[:8] %}{{ e.name }} ({{ e.facts }}){% if not loop.last %}, {% endif %}{% endfor %}
+        </div>
+      {% endif %}
+      <div style="margin-top:.5rem">
+        <input id="q-{{ loop.index }}" placeholder="ask this graph a question…" style="min-width:300px">
+        <button onclick="queryGraph('{{ g.corpus }}', {{ loop.index }})">Query facts</button>
+        <button class="danger" onclick="deleteGraph('{{ g.corpus }}')">Delete</button>
+      </div>
+      <pre id="facts-{{ loop.index }}" style="white-space:pre-wrap;margin-top:.5rem"></pre>
+    {% else %}
+      — not built
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+async function buildGraph(){
+  const corpus = document.getElementById('corpus').value;
+  const maxEl = document.getElementById('max_chunks');
+  const status = document.getElementById('status');
+  const body = { corpus };
+  if (maxEl.value) body.max_chunks = parseInt(maxEl.value);
+  status.textContent = 'Starting build (one cloud API call per chunk)…';
+  const r = await fetch('/api/kgraph/build', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  if(!r.ok){ status.textContent = 'Failed: ' + (await r.text()); return; }
+  const { job_id } = await r.json();
+  poll(job_id, status);
+}
+
+async function poll(jobId, status){
+  const r = await fetch(`/api/kgraph/build/${jobId}`);
+  const job = await r.json();
+  if (job.status === 'running'){
+    const p = job.progress || {};
+    status.textContent = `Extracting… ${p.done || 0}${p.total ? '/' + p.total : ''} chunks (${p.failed || 0} failed)`;
+    setTimeout(() => poll(jobId, status), 3000);
+  } else if (job.status === 'done'){
+    status.textContent = `Done: ${job.result.triples_total} triples total. Reloading…`;
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    status.textContent = 'Failed: ' + job.error;
+  }
+}
+
+async function queryGraph(corpus, idx){
+  const q = document.getElementById(`q-${idx}`).value;
+  const out = document.getElementById(`facts-${idx}`);
+  if(!q){ out.textContent = 'Type a question first.'; return; }
+  out.textContent = 'Querying…';
+  const r = await fetch('/api/kgraph/query', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ question: q, corpus }),
+  });
+  if(!r.ok){ out.textContent = 'Failed: ' + (await r.text()); return; }
+  const data = await r.json();
+  const res = (data.results || [])[0] || { facts: [], entities: [] };
+  if(!res.facts.length){ out.textContent = 'No facts found for the entities in that question.'; return; }
+  out.textContent = `Entities: ${res.entities.map(e => e.name).join(', ')}\n` +
+    res.facts.map(f => `${f.subject} --[${f.relation}]--> ${f.object}   (${f.source})`).join('\n');
+}
+
+async function deleteGraph(corpus){
+  if(!confirm(`Delete the knowledge graph for '${corpus}'?`)) return;
+  const r = await fetch(`/api/kgraph/${corpus}`, { method: 'DELETE' });
+  if(r.ok) location.reload();
+}
+</script>
+{% endblock %}

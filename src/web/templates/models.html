@@ -1,0 +1,134 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Models · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Models</h1>
+
+<div class="card">
+  <h3>Registered models</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Provider</th><th>Path</th><th>RAG corpus</th><th>Registered</th></tr></thead>
+    <tbody>
+      {% for m in registry.models %}
+      <tr>
+        <td>{{ m.name }}</td>
+        <td>{{ m.provider }}</td>
+        <td class="muted">{{ m.path or "—" }}</td>
+        <td>
+          <select id="corpus-{{ loop.index }}">
+            <option value="" {% if not m.rag_corpus %}selected{% endif %}>— none —</option>
+            {% for c in corpora %}
+            <option value="{{ c }}" {% if m.rag_corpus == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+          <button onclick="setCorpus('{{ m.name }}', document.getElementById('corpus-{{ loop.index }}').value)">Set</button>
+        </td>
+        <td class="muted">{{ m.registered_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No models registered yet — use the form below.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Register a model</h3>
+  <div class="row">
+    <input id="reg-name" placeholder="name (e.g. qwen2.5-1.5b-instruct)">
+    <select id="reg-provider">
+      {% for p in registry.providers %}
+      <option value="{{ p }}">{{ p }}</option>
+      {% endfor %}
+    </select>
+    <input id="reg-path" placeholder="path (e.g. Qwen/Qwen2.5-1.5B-Instruct)">
+  </div>
+  <div class="row" style="margin-top:0.5rem">
+    <select id="reg-device">
+      <option value="">device: engine default</option>
+      <option value="auto">auto</option>
+      <option value="cpu">cpu</option>
+      <option value="cuda">cuda</option>
+    </select>
+    <select id="reg-corpus">
+      <option value="">RAG corpus: none</option>
+      {% for c in corpora %}
+      <option value="{{ c }}">{{ c }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary" onclick="registerModel()">Register</button>
+  </div>
+  <p id="reg-status" class="muted"></p>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Load / Unload</h3>
+  <div class="row">
+    <input id="name" placeholder="model name (e.g. minilm)">
+    <button class="primary" onclick="loadModel()">Load</button>
+    <button onclick="unloadModel()">Unload</button>
+    <span id="loaded" class="pill ok">loaded: {{ registry.loaded or "none" }}</span>
+  </div>
+  <p class="muted">Providers available: {{ registry.providers | join(", ") }}</p>
+</div>
+
+<script>
+async function loadModel(){
+  const name = document.getElementById('name').value;
+  const r = await fetch('/api/models/load', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  const j = await r.json();
+  document.getElementById('loaded').textContent = 'loaded: ' + (j.loaded || 'none');
+}
+async function unloadModel(){
+  const r = await fetch('/api/models/unload', {method:'POST'});
+  const j = await r.json();
+  document.getElementById('loaded').textContent = 'loaded: ' + (j.loaded || 'none');
+}
+async function setCorpus(name, corpus){
+  const r = await fetch('/api/registry/set-rag-corpus', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, rag_corpus: corpus}),
+  });
+  if (!r.ok) { alert('Failed: ' + (await r.text())); return; }
+  location.reload();
+}
+async function registerModel(){
+  const body = {
+    name: document.getElementById('reg-name').value,
+    provider: document.getElementById('reg-provider').value,
+    path: document.getElementById('reg-path').value,
+    device: document.getElementById('reg-device').value || null,
+    rag_corpus: document.getElementById('reg-corpus').value || null,
+  };
+  const status = document.getElementById('reg-status');
+  status.textContent = 'Registering…';
+  const r = await fetch('/api/registry/register', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  if (!r.ok) { status.textContent = 'Failed: ' + (await r.text()); return; }
+  location.reload();
+}
+</script>
+{% endblock %}

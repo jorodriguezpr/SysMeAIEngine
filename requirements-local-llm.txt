@@ -1,0 +1,20 @@
+# Optional: run the offline answer model (Qwen2.5-7B-Instruct Q4_K_M GGUF)
+# INSIDE the engine with llama.cpp -- no Ollama needed. Registered as
+# `qwen7b-cpp` (provider llama_cpp, path models/gguf/qwen2.5-7b-instruct-q4_k_m.gguf).
+#
+# Fastest: build for THIS machine's CPU (AVX-512 on Zen 4/5 etc.). Needs
+# Visual Studio C++ build tools (pip fetches CMake itself), ~10-20 min:
+#   set CMAKE_ARGS=-DGGML_NATIVE=ON -DGGML_AVX512=ON
+#   set FORCE_CMAKE=1
+#   pip install llama-cpp-python==0.3.35 --no-binary llama-cpp-python --no-cache-dir
+#
+# Simple (no compiler, AVX2 only, ~20% slower):
+#   pip install llama-cpp-python==0.3.35 --only-binary=:all: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+#
+# Measured on the aprocrifos eval (Ryzen AI 7 350, CPU only): same answer
+# quality as the Ollama route (same model file), but ~35-40s per answer vs
+# Ollama's ~19s -- Ollama bundles a newer llama.cpp with faster prompt
+# processing. Ollama route: ENGINE_DEFAULT_MODEL=qwen7b-local (Ollama running).
+# A native build is tuned to the machine it was built on -- don't copy it
+# to the cluster laptops; build or use the prebuilt wheel there.
+llama-cpp-python==0.3.35

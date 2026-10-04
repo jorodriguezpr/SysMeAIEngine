@@ -1,0 +1,95 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SysMeAIEngine{% endblock %}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171a21; --border:#2a2e3a; --text:#e6e6e6; --dim:#9aa0ad;
+      --accent:#4da3ff; --ok:#34c759; --warn:#ff9500; --bad:#ff453a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg);color:var(--text);}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    header{background:var(--panel);border-bottom:1px solid var(--border);
+           padding:.6rem 1rem;display:flex;gap:1rem;align-items:center;
+           position:sticky;top:0;z-index:10}
+    header .brand{font-weight:600;color:var(--text)}
+    nav a{padding:.35rem .55rem;border-radius:6px}
+    nav a.active, nav a:hover{background:#1d2330;color:var(--text)}
+    main{padding:1rem 1.25rem;max-width:1400px;margin:0 auto}
+    .grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1rem}
+    .card h3{margin:0 0 .4rem;font-size:.85rem;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+    .big{font-size:1.8rem;font-weight:600}
+    .muted{color:var(--dim);font-size:.85rem}
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    th,td{padding:.4rem .5rem;border-bottom:1px solid var(--border);text-align:left}
+    th{color:var(--dim);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+    input,select,button,textarea{background:#0c0e12;color:var(--text);
+           border:1px solid var(--border);border-radius:6px;padding:.45rem .6rem;font-size:.9rem}
+    button{cursor:pointer}
+    button.primary{background:var(--accent);border-color:transparent;color:#08111f;font-weight:600}
+    button.danger{background:var(--bad);border-color:transparent;color:#fff}
+    .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+    .pill{display:inline-block;padding:.15rem .5rem;border-radius:999px;
+          border:1px solid var(--border);font-size:.75rem;color:var(--dim)}
+    .pill.ok{border-color:var(--ok);color:var(--ok)}
+    pre{background:#0c0e12;border:1px solid var(--border);border-radius:8px;
+        padding:.6rem;overflow:auto;font-size:.85rem;max-height:340px}
+    .chart-container{position:relative;height:180px}
+  </style>
+</head>
+<body>
+<header>
+  <span class="brand">🛠 SysMeAIEngine</span>
+  <nav>
+    <a href="/ui"        class="{% if active=='dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/ui/chat"   class="{% if active=='chat'      %}active{% endif %}">Chat</a>
+    <a href="/ui/models" class="{% if active=='models'    %}active{% endif %}">Models</a>
+    <a href="/ui/weights" class="{% if active=='weights'   %}active{% endif %}">Weights</a>
+    <a href="/ui/training" class="{% if active=='training' %}active{% endif %}">Training</a>
+    <a href="/ui/train-folder" class="{% if active=='train_folder' %}active{% endif %}">Train from Folder</a>
+    <a href="/ui/agent"  class="{% if active=='agent'     %}active{% endif %}">Agent</a>
+    <a href="/ui/kgraph" class="{% if active=='kgraph'    %}active{% endif %}">Knowledge Graph</a>
+    <a href="/ui/mcp"    class="{% if active=='mcp'       %}active{% endif %}">MCP</a>
+    <a href="/ui/storage" class="{% if active=='storage'   %}active{% endif %}">Storage</a>
+    <a href="/ui/cluster" class="{% if active=='cluster'   %}active{% endif %}">Cluster</a>
+    <a href="/ui/settings" class="{% if active=='settings'  %}active{% endif %}">Settings</a>
+    <a href="/ui/help"    class="{% if active=='help'      %}active{% endif %}">Learn</a>
+  </nav>
+  <span class="muted" style="margin-left:auto" id="hdr-host">v0.1.0</span>
+  <script>document.getElementById('hdr-host').textContent = 'v0.1.0 \u00b7 ' + location.host;</script>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

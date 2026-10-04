@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 150" width="900" height="150" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"><title>Distillation: raw chunk to cloud model to clean question answer pair to small model</title><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4da3ff"/></marker></defs><rect x="0" y="0" width="900" height="150" rx="14" fill="#0f1115"/>
+      <g font-size="12" text-anchor="middle">
+        <rect x="10" y="40" width="200" height="70" rx="8" fill="#1d2330"/><text x="110" y="64" fill="#e6e6e6">raw OCR'd chunk</text><text x="110" y="84" fill="#9aa0ad" font-size="10.5">"…y Nicodemo dijo a los</text><text x="110" y="98" fill="#9aa0ad" font-size="10.5">sacer- dotes que…"</text>
+        <rect x="250" y="40" width="170" height="70" rx="8" fill="#171a21" stroke="#4da3ff"/><text x="335" y="70" fill="#4da3ff">stronger model</text><text x="335" y="88" fill="#9aa0ad" font-size="10.5">(build time only)</text>
+        <rect x="460" y="30" width="230" height="90" rx="8" fill="#0f1a12" stroke="#34c759"/><text x="575" y="56" fill="#34c759">clean Q &amp; A pair</text><text x="575" y="78" fill="#cfd5df" font-size="10.5">Q: ¿Qué dijo Nicodemo a los</text><text x="575" y="92" fill="#cfd5df" font-size="10.5">sacerdotes? A: …</text>
+        <rect x="730" y="40" width="160" height="70" rx="8" fill="#1d2330"/><text x="810" y="70" fill="#e6e6e6">small model</text><text x="810" y="88" fill="#9aa0ad" font-size="10.5">fine-tuned on pairs</text>
+      </g>
+      <g stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"><line x1="212" y1="75" x2="246" y2="75"/><line x1="422" y1="75" x2="456" y2="75"/><line x1="692" y1="75" x2="726" y2="75"/></g>
+    </svg>

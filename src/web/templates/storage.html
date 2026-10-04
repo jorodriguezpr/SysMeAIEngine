@@ -1,0 +1,104 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Storage · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Storage</h1>
+<p class="muted">
+  Delete trained models and/or their training artifacts (extracted raw text, chunks, dataset, RAG index)
+  to free up disk space. This only touches files this engine created under <code>data/</code> and
+  <code>models/</code> — never your original source PDFs/documents elsewhere on disk. Deletions cannot be undone.
+</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>models/ total</h3>
+    <div class="big">{{ totals.models_dir }}</div>
+  </div>
+  <div class="card">
+    <h3>data/ total</h3>
+    <div class="big">{{ totals.data_dir }}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Registered models</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Provider</th><th>Size on disk</th><th></th></tr></thead>
+    <tbody>
+      {% for m in models %}
+      <tr>
+        <td>{{ m.name }}</td>
+        <td class="muted">{{ m.provider }}</td>
+        <td class="muted">{{ m.size if m.has_files else "— (no local files)" }}</td>
+        <td><button class="danger" onclick="deleteModel('{{ m.name }}')">Delete</button></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No models registered.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Training data (raw text / chunks / dataset / RAG index)</h3>
+  <p class="muted">
+    Grouped by job/corpus name. Deleting here removes only the ingested/processed data — a registered
+    model with the same name is untouched (delete it separately above if you want it gone too).
+  </p>
+  <table>
+    <thead><tr><th>Name</th><th>Size on disk</th><th></th></tr></thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr>
+        <td>{{ j.name }}</td>
+        <td class="muted">{{ j.size }}</td>
+        <td><button class="danger" onclick="deleteJob('{{ j.name }}')">Delete</button></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">No training data found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div id="storage-result" class="muted" style="margin-top:.5rem"></div>
+
+<script>
+async function deleteModel(name){
+  if(!confirm(`Delete model "${name}"? This unregisters it and removes its checkpoint/weight files. This cannot be undone.`)) return;
+  const r = await fetch('/api/storage/delete-model', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  const j = await r.json();
+  document.getElementById('storage-result').textContent = r.ok ? `Deleted model: ${name}` : ('ERR ' + (j.detail || r.statusText));
+  if(r.ok) setTimeout(() => location.reload(), 500);
+}
+async function deleteJob(name){
+  if(!confirm(`Delete all training data for "${name}" (raw text, chunks, dataset, RAG index)? This cannot be undone.`)) return;
+  const r = await fetch('/api/storage/delete-job', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  const j = await r.json();
+  document.getElementById('storage-result').textContent = r.ok ? `Deleted training data: ${name}` : ('ERR ' + (j.detail || r.statusText));
+  if(r.ok) setTimeout(() => location.reload(), 500);
+}
+</script>
+{% endblock %}

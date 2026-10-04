@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sysadmin-ai-engine"
+version = "0.1.0"
+description = "Local AI model engine for AMD CPU/NPU with PDF training + OpenAI/MCP API"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Jose Rodriguez", email = "jrpcone@gmail.com" }]
+maintainers = [{ name = "Jose Rodriguez", email = "jrpcone@gmail.com" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://microrepair.net"
+Repository = "https://github.com/jorodriguezpr"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

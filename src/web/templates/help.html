@@ -1,0 +1,834 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Learn · SysMeAIEngine{% endblock %}
+{% block content %}
+<style>
+  .fig{margin:.75rem 0;padding:.75rem;background:#0c0e12;border:1px solid var(--border);border-radius:10px;overflow-x:auto}
+  .fig svg{display:block;width:100%;height:auto;min-width:560px}
+  .fig figcaption{color:var(--dim);font-size:.8rem;margin-top:.4rem}
+  .fig svg text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .steps{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:.5rem}
+  .step{border:1px solid var(--border);border-radius:10px;padding:.75rem;background:#12151b}
+  .step .n{display:inline-flex;width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent);color:#08111f;
+           font-weight:700;align-items:center;justify-content:center;margin-right:.4rem}
+  .step h4{margin:0 0 .4rem;font-size:1rem;display:flex;align-items:center}
+  .step ul{margin:.3rem 0 0;padding-left:1.1rem}
+  .step li{margin:.15rem 0}
+  .see{color:var(--ok);font-size:.85rem;margin-top:.4rem}
+  .callout{border-left:3px solid var(--warn);background:#1c1810;padding:.6rem .8rem;border-radius:6px;margin:.6rem 0}
+  .callout.good{border-left-color:var(--ok);background:#0f1a12}
+  .two{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  kbd{background:#0c0e12;border:1px solid var(--border);border-radius:4px;padding:.05rem .35rem;font-size:.8rem}
+  .chk li{list-style:none;margin:.25rem 0}
+  .chk li::before{content:"☐ ";color:var(--accent)}
+  #lab-out{display:flex;flex-direction:column;gap:.4rem;max-height:420px;overflow:auto;margin-top:.5rem}
+  .chunk{border-radius:6px;padding:.45rem .6rem;font-size:.82rem;white-space:pre-wrap;border:1px solid var(--border)}
+  .chunk b{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.15rem}
+  .chunk .ov{background:#ff950033;border-radius:3px}
+  .stat{display:inline-block;margin-right:1rem}
+</style>
+
+<h1>Learn: build an AI assistant from your own documents</h1>
+<p class="muted">
+  No prior AI knowledge assumed. Start with <b>Start here</b> for a click-by-click
+  walkthrough, then read the later sections to understand what each step does behind the scenes.
+  Diagrams marked <i>illustrative</i> explain an idea; charts marked <i>measured</i> are real
+  results from this project's own testing.
+</p>
+
+<div class="card">
+  <h3>Contents</h3>
+  <div class="row" style="gap:.75rem">
+    <a href="#start"><b>★ Start here: your first document assistant</b></a>
+    <a href="#paths">Search vs. fine-tuning: which one answers questions?</a>
+    <a href="#prep">Preparing your documents</a>
+    <a href="#lab">Chunking playground (try it)</a>
+    <a href="#trouble">Troubleshooting</a>
+  </div>
+  <div class="row" style="gap:.75rem;margin-top:.5rem">
+    <a href="#model">1. What is an AI model?</a>
+    <a href="#tokens">2. Tokens</a>
+    <a href="#embeddings">3. Embeddings</a>
+    <a href="#network">4. Neural networks &amp; weights</a>
+    <a href="#training">5. How training works</a>
+    <a href="#overfitting">6. Overfitting</a>
+    <a href="#finetuning">7. Fine-tuning &amp; LoRA</a>
+    <a href="#dataquality">8. Training data quality</a>
+    <a href="#rag">9. RAG (retrieval)</a>
+    <a href="#hardware">10. CPU vs GPU vs NPU</a>
+    <a href="#glossary">11. Glossary</a>
+    <a href="#map">12. Where things live in this app</a>
+  </div>
+</div>
+
+<!-- ───────────────────────────── START HERE ───────────────────────────── -->
+<div class="card" id="start" style="margin-top:1rem">
+  <h3>★ Start here: your first document assistant in 5 steps</h3>
+  <p>
+    Goal: ask questions in <a href="/ui/chat">Chat</a> and get answers taken from <i>your</i>
+    documents, with the sources listed, all running on this computer with no cloud service needed.
+    One <a href="/ui/train-folder">Train from Folder</a> job does the heavy lifting; you then
+    connect the result to an answering model and start asking.
+  </p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 980 230" role="img" aria-label="Pipeline: documents, Train from Folder, search index and small model, connect on Models page, ask in Chat">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4da3ff"/></marker>
+      </defs>
+      <!-- 1 documents -->
+      <g transform="translate(10,55)">
+        <rect width="150" height="120" rx="12" fill="#171a21" stroke="#2a2e3a"/>
+        <rect x="28" y="18" width="46" height="58" rx="4" fill="#1d2330" stroke="#4da3ff"/>
+        <rect x="40" y="28" width="46" height="58" rx="4" fill="#1d2330" stroke="#4da3ff"/>
+        <rect x="52" y="38" width="46" height="58" rx="4" fill="#232a38" stroke="#4da3ff"/>
+        <text x="75" y="70" fill="#4da3ff" font-size="11" text-anchor="middle">PDF</text>
+        <text x="75" y="112" fill="#e6e6e6" font-size="13" text-anchor="middle" font-weight="600">1 · Your documents</text>
+      </g>
+      <line x1="165" y1="115" x2="200" y2="115" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      <!-- 2 train from folder -->
+      <g transform="translate(205,30)">
+        <rect width="220" height="170" rx="12" fill="#171a21" stroke="#4da3ff"/>
+        <text x="110" y="24" fill="#e6e6e6" font-size="13" text-anchor="middle" font-weight="600">2 · Train from Folder (one job)</text>
+        <g font-size="11.5" fill="#cfd5df">
+          <rect x="14" y="38" width="192" height="24" rx="6" fill="#1d2330"/><text x="24" y="54">Extract text (+ OCR for scans)</text>
+          <rect x="14" y="68" width="192" height="24" rx="6" fill="#1d2330"/><text x="24" y="84">Clean &amp; split into chunks</text>
+          <rect x="14" y="98" width="192" height="24" rx="6" fill="#1d2330"/><text x="24" y="114">Build search index (RAG)</text>
+          <rect x="14" y="128" width="192" height="24" rx="6" fill="#1d2330"/><text x="24" y="144">Fine-tune a small model (optional)</text>
+        </g>
+      </g>
+      <line x1="430" y1="115" x2="465" y2="115" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      <!-- 3 outputs -->
+      <g transform="translate(470,40)">
+        <rect width="160" height="70" rx="12" fill="#0f1a12" stroke="#34c759"/>
+        <text x="80" y="28" fill="#34c759" font-size="13" text-anchor="middle" font-weight="600">Search index</text>
+        <text x="80" y="48" fill="#cfd5df" font-size="11" text-anchor="middle">"corpus" named after</text>
+        <text x="80" y="62" fill="#cfd5df" font-size="11" text-anchor="middle">your job</text>
+        <rect y="90" width="160" height="60" rx="12" fill="#171a21" stroke="#2a2e3a"/>
+        <text x="80" y="115" fill="#9aa0ad" font-size="12.5" text-anchor="middle">Small trained model</text>
+        <text x="80" y="133" fill="#9aa0ad" font-size="11" text-anchor="middle">(registered, optional)</text>
+        <text x="80" y="-8" fill="#e6e6e6" font-size="13" text-anchor="middle" font-weight="600">3 · Results</text>
+      </g>
+      <line x1="635" y1="80" x2="670" y2="105" stroke="#34c759" stroke-width="2" marker-end="url(#ar)"/>
+      <!-- 4 connect -->
+      <g transform="translate(675,55)">
+        <rect width="140" height="120" rx="12" fill="#171a21" stroke="#2a2e3a"/>
+        <text x="70" y="26" fill="#e6e6e6" font-size="13" text-anchor="middle" font-weight="600">4 · Models page</text>
+        <text x="70" y="52" fill="#cfd5df" font-size="11" text-anchor="middle">Answering model</text>
+        <text x="70" y="68" fill="#cfd5df" font-size="11" text-anchor="middle">(local Qwen 7B)</text>
+        <text x="70" y="88" fill="#4da3ff" font-size="11" text-anchor="middle">RAG corpus = your job</text>
+        <rect x="45" y="96" width="50" height="16" rx="4" fill="#4da3ff"/><text x="70" y="108" fill="#08111f" font-size="10" text-anchor="middle" font-weight="700">Set</text>
+      </g>
+      <line x1="820" y1="115" x2="845" y2="115" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      <!-- 5 chat -->
+      <g transform="translate(850,55)">
+        <rect width="120" height="120" rx="12" fill="#171a21" stroke="#2a2e3a"/>
+        <text x="60" y="26" fill="#e6e6e6" font-size="13" text-anchor="middle" font-weight="600">5 · Chat</text>
+        <rect x="14" y="40" width="80" height="20" rx="8" fill="#1d2330"/><text x="20" y="54" fill="#cfd5df" font-size="10">Your question?</text>
+        <rect x="26" y="66" width="80" height="34" rx="8" fill="#0f1a12" stroke="#34c759"/>
+        <text x="32" y="80" fill="#cfd5df" font-size="10">Answer…</text>
+        <text x="32" y="94" fill="#34c759" font-size="9">[sources]</text>
+      </g>
+    </svg>
+    <figcaption>The whole flow. Step 2 is one job; step 4 is a single dropdown; then you just ask questions.</figcaption>
+  </figure>
+
+  <div class="steps">
+    <div class="step">
+      <h4><span class="n">1</span>Put your documents in one folder</h4>
+      <ul>
+        <li>Supported: <b>PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), .txt</b>.</li>
+        <li>Scanned PDFs and images (.png/.jpg/.tif) work when the <b>OCR</b> card on Train from Folder says <i>on</i>.</li>
+        <li>Subfolders are fine (they're scanned recursively).</li>
+        <li>Start small: 1–10 documents is plenty for a first try.</li>
+      </ul>
+    </div>
+    <div class="step">
+      <h4><span class="n">2</span>Run a Train from Folder job</h4>
+      <ul>
+        <li><b>Source folder:</b> the folder from step 1.</li>
+        <li><b>Job / model name:</b> a short name, e.g. <kbd>my-docs</kbd>. Your search index gets this name.</li>
+        <li><b>Chunking:</b> <kbd>paragraph</kbd> (the cleanest pieces; see the <a href="#lab">playground</a>).</li>
+        <li>Leave the rest at the defaults (<kbd>gpt2</kbd>, <kbd>lm</kbd>, <kbd>sft</kbd>, 1 epoch).</li>
+        <li>Click <b>Preview dataset size</b>, then <b>Start</b>.</li>
+      </ul>
+      <div class="see">✓ The job appears in the <b>Jobs</b> table; open its log to watch progress.</div>
+    </div>
+    <div class="step">
+      <h4><span class="n">3</span>Wait, then check the search</h4>
+      <ul>
+        <li>The search index is built at the end of the job. Fine-tuning takes most of the time (about an hour at 2000 rows with gpt2 on this hardware). Lower <b>Max rows</b> for a quicker test.</li>
+        <li>Optional: in <b>Evaluate a RAG corpus</b>, pick your corpus, keep <kbd>hybrid</kbd>, and run it. It reports how often the right passage is found.</li>
+      </ul>
+      <div class="see">✓ Status turns <i>done</i> and your corpus appears in the corpus dropdowns.</div>
+    </div>
+    <div class="step">
+      <h4><span class="n">4</span>Connect the index to the answering model</h4>
+      <ul>
+        <li>Open <a href="/ui/models">Models</a>.</li>
+        <li>Find the local answering model (the engine default is the Qwen 2.5 7B model, e.g. <kbd>qwen7b-cpp</kbd> or <kbd>qwen7b-local</kbd>).</li>
+        <li>In its <b>RAG corpus</b> column pick your job name and click <b>Set</b>.</li>
+      </ul>
+      <div class="see">✓ Why the 7B model and not the one you just trained? See the <a href="#paths">measured comparison</a> below.</div>
+    </div>
+    <div class="step">
+      <h4><span class="n">5</span>Ask questions in Chat</h4>
+      <ul>
+        <li>On <a href="/ui/settings">Settings</a> make sure <b>Grounded mode</b> = <i>Grounded (retrieve from documents first)</i>.</li>
+        <li>Ask in <a href="/ui/chat">Chat</a>. Answers list the passages they came from.</li>
+        <li>A question your documents don't cover should get a polite refusal. That means it's working, not guessing.</li>
+      </ul>
+      <div class="see">✓ Expect roughly 15–40 seconds per answer on CPU.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────────── PATHS ───────────────────────────── -->
+<div class="card" id="paths" style="margin-top:1rem">
+  <h3>Search vs. fine-tuning: which one actually answers questions?</h3>
+  <p>
+    There are two ways to make a model "know" your documents. <b>Fine-tuning</b> changes the
+    model's weights so it memorizes something of your text. <b>Retrieval (RAG)</b> leaves the model
+    alone and, for every question, finds the relevant passages and hands them to the model to read.
+    This project measured both on the same 30 questions about the same book:
+  </p>
+  <figure class="fig">
+    <div style="position:relative;height:260px;min-width:520px"><canvas id="chart-paths"></canvas></div>
+    <figcaption><i>Measured.</i> Share of the 30 questions answered fully correctly. Every model received the same retrieved passages; only the answering model differs. Fine-tuning a small model on the book on top of this gave no measurable gain.</figcaption>
+  </figure>
+  <div class="two">
+    <div class="callout good">
+      <b>Use retrieval (the search index) to answer questions.</b> It scales to many documents,
+      lists its sources, refuses when the answer isn't there (100% of out-of-document questions
+      in testing), and gets better with a stronger answering model. No retraining is needed when
+      you add documents; just run a new job.
+    </div>
+    <div class="callout">
+      <b>Use fine-tuning to change style or vocabulary,</b> not to store facts. A small model
+      fine-tuned on a book still misspells names and mixes up details (see sections 6 and 8). It's
+      a great way to <i>learn</i> how training works, and the Weights page shows exactly what changed.
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────────── PREP ───────────────────────────── -->
+<div class="card" id="prep" style="margin-top:1rem">
+  <h3>Preparing your documents: a checklist</h3>
+  <div class="two">
+    <ul class="chk">
+      <li><b>Text, not just pictures of text.</b> If you can select text in the PDF, it has a text layer. Scans need OCR (check the OCR card).</li>
+      <li><b>One topic per folder / job.</b> Mixing unrelated subjects makes retrieval pick passages from the wrong book.</li>
+      <li><b>Remove junk:</b> duplicate copies, blank pages, tables of contents, and indexes add noise to search results.</li>
+      <li><b>Real paragraphs.</b> Paragraph chunking relies on blank lines between paragraphs. Text exported with a line break on every line chunks worse.</li>
+    </ul>
+    <ul class="chk">
+      <li><b>Readable file names</b> (e.g. <kbd>chapter-03-genesis.pdf</kbd>). The source name is shown next to every answer.</li>
+      <li><b>Spanish and English both work.</b> The search embeddings are multilingual, and refusals come back in the question's language.</li>
+      <li><b>Start small, then grow.</b> Test with a few files, check answers in Chat, then point a new job at the full folder.</li>
+      <li><b>Write down 10 test questions</b> whose answers you know. Ask them after every change, so you know whether it really got better.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ───────────────────────────── CHUNK LAB ───────────────────────────── -->
+<div class="card" id="lab" style="margin-top:1rem">
+  <h3>Chunking playground (try it)</h3>
+  <p>
+    Before anything can be searched or trained on, documents are cut into <b>chunks</b>. This
+    playground uses the same rules as the app's three <b>Chunking</b> options: 1200 characters per
+    chunk by default, <kbd>window</kbd> overlapping by 150 characters, <kbd>structured</kbd>
+    repeating 1 sentence. Paste your own text, or use the sample, and compare. Overlap is highlighted in orange.
+  </p>
+  <div class="row">
+    <label>Mode
+      <select id="lab-mode">
+        <option value="window">window (fixed slices)</option>
+        <option value="structured">structured (whole sentences)</option>
+        <option value="paragraph" selected>paragraph (whole paragraphs)</option>
+      </select>
+    </label>
+    <label>Chunk size <input id="lab-size" type="range" min="120" max="1600" step="20" value="400"> <span id="lab-size-v">400</span> chars</label>
+    <button type="button" onclick="labSample()">Load sample text</button>
+  </div>
+  <textarea id="lab-text" rows="7" style="width:100%;margin-top:.5rem" placeholder="Paste a few paragraphs here (leave a blank line between paragraphs)…"></textarea>
+  <div class="muted" id="lab-stats" style="margin-top:.4rem"></div>
+  <div id="lab-out"></div>
+  <p class="muted">What to notice: <kbd>window</kbd> cuts mid-word ("…the anc"), so retrieval can hand the model half a sentence.
+    <kbd>paragraph</kbd> keeps ideas whole, which is why the search index always uses it. The playground starts at a
+    small size so you can see several chunks; the app uses 1200.</p>
+</div>
+
+<!-- ───────────────────────────── CONCEPTS ───────────────────────────── -->
+<div class="card" id="model" style="margin-top:1rem">
+  <h3>1. What is an AI model?</h3>
+  <p>
+    A language model is a very large mathematical function. You give it some
+    text, and it predicts what text is most likely to come next — one small
+    piece at a time. It learned those predictions by reading huge amounts of
+    existing text during "training," the same way you'd get a feel for how
+    sentences usually continue after reading enough of them, except the
+    model does this with math (billions of adjustable numbers) instead of
+    intuition.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 900 120" role="img" aria-label="Next-token prediction example">
+      <rect x="10" y="35" width="380" height="50" rx="10" fill="#1d2330" stroke="#2a2e3a"/>
+      <text x="25" y="66" fill="#e6e6e6" font-size="16">"El rey entró en el …"</text>
+      <line x1="395" y1="60" x2="450" y2="60" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="455" y="20" width="110" height="80" rx="10" fill="#171a21" stroke="#4da3ff"/>
+      <text x="510" y="56" fill="#4da3ff" font-size="14" text-anchor="middle" font-weight="600">Model</text>
+      <text x="510" y="76" fill="#9aa0ad" font-size="11" text-anchor="middle">billions of numbers</text>
+      <line x1="570" y1="60" x2="625" y2="60" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      <g font-size="13">
+        <text x="635" y="30" fill="#cfd5df">palacio</text><rect x="720" y="19" width="150" height="14" rx="3" fill="#34c759"/><text x="875" y="31" fill="#34c759" font-size="11">62%</text>
+        <text x="635" y="58" fill="#cfd5df">templo</text><rect x="720" y="47" width="55" height="14" rx="3" fill="#4da3ff"/><text x="780" y="59" fill="#9aa0ad" font-size="11">22%</text>
+        <text x="635" y="86" fill="#cfd5df">jardín</text><rect x="720" y="75" width="25" height="14" rx="3" fill="#4da3ff"/><text x="750" y="87" fill="#9aa0ad" font-size="11">9%</text>
+        <text x="635" y="110" fill="#9aa0ad">…</text>
+      </g>
+    </svg>
+    <figcaption><i>Illustrative.</i> The model scores every possible next piece, one gets picked, and the process repeats until the answer is written.</figcaption>
+  </figure>
+  <p>
+    Everything else on this page — tokens, embeddings, layers, training,
+    fine-tuning, RAG — is really just answering one question in more detail:
+    <i>how does a pile of numbers learn to predict text well, and how do we
+    steer it toward our own documents and language?</i>
+  </p>
+</div>
+
+<div class="card" id="tokens" style="margin-top:1rem">
+  <h3>2. Tokens: how text becomes numbers</h3>
+  <p>
+    A model can't read letters — it only does math on numbers. So before any
+    text reaches the model, a <b>tokenizer</b> chops it into small pieces
+    (words, parts of words, or punctuation) and looks each piece up in a
+    fixed dictionary, turning it into a number called a <b>token id</b>. The
+    word "unbelievable" might become three tokens ("un", "believ", "able")
+    if the model has never seen that exact whole word often enough to earn
+    its own entry.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 900 150" role="img" aria-label="Tokenization example">
+      <text x="10" y="30" fill="#9aa0ad" font-size="12">text</text>
+      <text x="80" y="30" fill="#e6e6e6" font-size="18">unbelievable · Nicodemo</text>
+      <text x="10" y="80" fill="#9aa0ad" font-size="12">tokens</text>
+      <g font-size="15">
+        <rect x="80" y="58" width="44" height="30" rx="6" fill="#1d3a5c"/><text x="102" y="79" fill="#e6e6e6" text-anchor="middle">un</text>
+        <rect x="128" y="58" width="70" height="30" rx="6" fill="#1d4a3a"/><text x="163" y="79" fill="#e6e6e6" text-anchor="middle">believ</text>
+        <rect x="202" y="58" width="56" height="30" rx="6" fill="#4a3a1d"/><text x="230" y="79" fill="#e6e6e6" text-anchor="middle">able</text>
+        <rect x="300" y="58" width="56" height="30" rx="6" fill="#3a1d4a"/><text x="328" y="79" fill="#e6e6e6" text-anchor="middle">Nic</text>
+        <rect x="360" y="58" width="50" height="30" rx="6" fill="#1d3a5c"/><text x="385" y="79" fill="#e6e6e6" text-anchor="middle">od</text>
+        <rect x="414" y="58" width="56" height="30" rx="6" fill="#1d4a3a"/><text x="442" y="79" fill="#e6e6e6" text-anchor="middle">emo</text>
+      </g>
+      <text x="10" y="130" fill="#9aa0ad" font-size="12">ids</text>
+      <g font-size="13" fill="#4da3ff" text-anchor="middle">
+        <text x="102" y="130">403</text><text x="163" y="130">32927</text><text x="230" y="130">540</text>
+        <text x="328" y="130">45</text><text x="385" y="130">375</text><text x="442" y="130">41903</text>
+      </g>
+      <text x="520" y="75" fill="#9aa0ad" font-size="12.5">A small model that writes "Nicodmo" picked</text>
+      <text x="520" y="95" fill="#9aa0ad" font-size="12.5">a slightly wrong sequence of these pieces;</text>
+      <text x="520" y="115" fill="#9aa0ad" font-size="12.5">it never "saw" the letters themselves.</text>
+    </svg>
+    <figcaption><i>Illustrative</i> splits and ids. Real values depend on each model's tokenizer.</figcaption>
+  </figure>
+  <p class="muted">See it live: the <a href="/ui/chat">Chat</a> page shows prompt/completion token counts on every response.</p>
+</div>
+
+<div class="card" id="embeddings" style="margin-top:1rem">
+  <h3>3. Embeddings: turning meaning into geometry</h3>
+  <p>
+    Once text is tokens (numbers), the model converts each token into a list
+    of a few hundred numbers called a <b>vector</b> — its <b>embedding</b>.
+    The trick that makes this useful: during training, the model arranges
+    these vectors in space so that words with related meaning end up near
+    each other. "King" and "queen" end up close together; "king" and
+    "bicycle" end up far apart. This is also exactly how this engine finds
+    relevant passages in your documents — it turns your question into a
+    vector the same way, and looks for document chunks whose vectors are
+    nearby, which is a much better test of "is this relevant?" than just
+    checking for shared words.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 900 260" role="img" aria-label="Embedding space with meaning clusters">
+      <rect x="10" y="10" width="560" height="240" rx="10" fill="#10131a" stroke="#2a2e3a"/>
+      <g font-size="13">
+        <circle cx="120" cy="70" r="6" fill="#34c759"/><text x="132" y="74" fill="#cfd5df">king · rey</text>
+        <circle cx="150" cy="110" r="6" fill="#34c759"/><text x="162" y="114" fill="#cfd5df">queen · reina</text>
+        <circle cx="95" cy="130" r="6" fill="#34c759"/><text x="40" y="150" fill="#cfd5df">palace · palacio</text>
+        <circle cx="420" cy="190" r="6" fill="#ff9500"/><text x="432" y="194" fill="#cfd5df">bicycle</text>
+        <circle cx="460" cy="160" r="6" fill="#ff9500"/><text x="472" y="164" fill="#cfd5df">car · coche</text>
+        <circle cx="390" cy="225" r="6" fill="#ff9500"/><text x="402" y="229" fill="#cfd5df">train</text>
+        <circle cx="330" cy="70" r="6" fill="#4da3ff"/><text x="342" y="74" fill="#cfd5df">temple · templo</text>
+        <circle cx="370" cy="40" r="6" fill="#4da3ff"/><text x="382" y="44" fill="#cfd5df">priest · sacerdote</text>
+        <circle cx="200" cy="85" r="8" fill="none" stroke="#fff" stroke-width="2"/><text x="212" y="80" fill="#fff" font-weight="600">your question</text>
+        <line x1="200" y1="85" x2="150" y2="110" stroke="#fff" stroke-dasharray="4 3"/>
+        <line x1="200" y1="85" x2="120" y2="70" stroke="#fff" stroke-dasharray="4 3"/>
+      </g>
+      <g font-size="12.5" fill="#9aa0ad">
+        <text x="600" y="50">• Related meanings sit close together,</text>
+        <text x="612" y="68">in any language (multilingual model).</text>
+        <text x="600" y="100">• Your question becomes a point too.</text>
+        <text x="600" y="132">• Search = "which chunks are</text>
+        <text x="612" y="150">nearest to my question?"</text>
+        <text x="600" y="182">• Real embeddings have hundreds of</text>
+        <text x="612" y="200">dimensions; this is a 2-D sketch.</text>
+      </g>
+    </svg>
+    <figcaption><i>Illustrative.</i> Nearby points mean similar meaning; the dashed lines are a nearest-neighbor search.</figcaption>
+  </figure>
+  <p class="muted">See it live: the <a href="/ui/models">Models</a> page lists the embedding model this engine uses for that.</p>
+</div>
+
+<div class="card" id="network" style="margin-top:1rem">
+  <h3>4. Neural networks and weights</h3>
+  <p>
+    A neural network is a stack of layers, each one taking the previous
+    layer's output, multiplying it by a big table of adjustable numbers
+    (the layer's <b>weights</b>), and passing the result to the next layer.
+    Modern language models use a design called a <b>transformer</b>, where
+    each layer also has an "attention" step that lets every token look at
+    every other token in the input to decide what's relevant to it before
+    moving on — this is what lets a model connect "it" back to the right
+    noun several sentences earlier.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 900 170" role="img" aria-label="Transformer layer stack">
+      <g font-size="12" text-anchor="middle">
+        <rect x="10" y="60" width="110" height="50" rx="8" fill="#1d2330"/><text x="65" y="90" fill="#cfd5df">token ids</text>
+        <rect x="140" y="60" width="110" height="50" rx="8" fill="#1d3a5c"/><text x="195" y="90" fill="#e6e6e6">embeddings</text>
+        <g>
+          <rect x="270" y="20" width="400" height="130" rx="10" fill="#171a21" stroke="#4da3ff" stroke-dasharray="5 4"/>
+          <text x="470" y="40" fill="#4da3ff">× N transformer layers (12 in gpt2, 28 in Qwen 7B)</text>
+          <rect x="290" y="60" width="160" height="50" rx="8" fill="#1d4a3a"/><text x="370" y="82" fill="#e6e6e6">attention</text><text x="370" y="98" fill="#9aa0ad" font-size="10.5">q_proj · k_proj · v_proj</text>
+          <rect x="490" y="60" width="160" height="50" rx="8" fill="#4a3a1d"/><text x="570" y="82" fill="#e6e6e6">feed-forward</text><text x="570" y="98" fill="#9aa0ad" font-size="10.5">most of the weights</text>
+        </g>
+        <rect x="690" y="60" width="200" height="50" rx="8" fill="#0f1a12" stroke="#34c759"/><text x="790" y="82" fill="#34c759">next-token scores</text><text x="790" y="98" fill="#9aa0ad" font-size="10.5">→ pick → repeat</text>
+      </g>
+      <g stroke="#4da3ff" stroke-width="2"><line x1="120" y1="85" x2="138" y2="85"/><line x1="250" y1="85" x2="288" y2="85"/><line x1="450" y1="85" x2="488" y2="85"/><line x1="650" y1="85" x2="688" y2="85"/></g>
+    </svg>
+    <figcaption><i>Illustrative.</i> The same structure repeats layer after layer; training only changes the numbers inside the boxes.</figcaption>
+  </figure>
+  <p>
+    Training a model just means: nudge those weight numbers, over and over,
+    until the network's predictions get better. There's no other magic
+    ingredient — a trained model and an untrained one have the exact same
+    structure, just different numbers in those weight tables.
+  </p>
+  <p class="muted">See it live: the <a href="/ui/weights">Weights</a> page shows the real weight tables of whatever model is currently loaded, including a graph of the network's layers colored by how much each layer's weights have moved.</p>
+</div>
+
+<div class="card" id="training" style="margin-top:1rem">
+  <h3>5. How training actually works</h3>
+  <p>Training repeats one loop, many times:</p>
+  <figure class="fig">
+    <svg viewBox="0 0 900 240" role="img" aria-label="Training loop: predict, measure loss, backpropagate, update">
+      <g font-size="13" text-anchor="middle">
+        <rect x="330" y="10" width="240" height="44" rx="10" fill="#1d2330" stroke="#4da3ff"/><text x="450" y="31" fill="#e6e6e6">① show text, hide the next token</text><text x="450" y="47" fill="#9aa0ad" font-size="11">a batch of rows from your dataset</text>
+        <rect x="620" y="98" width="260" height="44" rx="10" fill="#1d2330" stroke="#4da3ff"/><text x="750" y="119" fill="#e6e6e6">② model predicts it</text><text x="750" y="135" fill="#9aa0ad" font-size="11">forward pass</text>
+        <rect x="330" y="186" width="240" height="44" rx="10" fill="#3a1d1d" stroke="#ff453a"/><text x="450" y="207" fill="#e6e6e6">③ measure how wrong = loss</text><text x="450" y="223" fill="#9aa0ad" font-size="11">lower is better</text>
+        <rect x="20" y="98" width="260" height="44" rx="10" fill="#0f1a12" stroke="#34c759"/><text x="150" y="119" fill="#e6e6e6">④ nudge every weight a little</text><text x="150" y="135" fill="#9aa0ad" font-size="11">backpropagation + gradient descent</text>
+        <text x="450" y="128" fill="#4da3ff" font-size="15" font-weight="600">1 loop = 1 step</text>
+        <text x="450" y="148" fill="#9aa0ad" font-size="11.5">all rows once = 1 epoch</text>
+      </g>
+      <g fill="none" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)">
+        <path d="M575 35 Q700 40 735 92"/><path d="M745 146 Q720 205 578 208"/><path d="M325 208 Q180 205 155 148"/><path d="M160 94 Q190 40 325 35"/>
+      </g>
+    </svg>
+    <figcaption><i>Illustrative.</i> The four steps of every training step.</figcaption>
+  </figure>
+  <p>
+    Each single pass through step 1-4 is one <b>training step</b>. Doing
+    this for every example in your dataset once is one <b>epoch</b>. The
+    <b>batch size</b> is how many examples get shown together before a
+    single nudge — bigger batches make each nudge more stable but need more
+    memory, and fewer nudges happen per epoch as a result.
+  </p>
+  <p>
+    A real, concrete number from this exact project: fine-tuning a small
+    model on a 236-example dataset with the wrong settings produced only
+    <b>2 real training steps</b> for the entire run — nowhere near enough
+    nudges to teach it anything. That's a genuine bug this project hit and
+    fixed (it now automatically raises the step count for small datasets).
+    The lesson generalizes: a model is only as trained as however many real
+    nudges it actually got, not how much data you pointed at it.
+  </p>
+  <p class="muted">See it live: the <a href="/ui/train-folder">Train from Folder</a> page runs this whole loop on your own documents and shows you the resulting loss.</p>
+</div>
+
+<div class="card" id="overfitting" style="margin-top:1rem">
+  <h3>6. Overfitting: why more training isn't always better</h3>
+  <p>
+    You'd assume training longer always makes a model better. It doesn't,
+    and this project has a real, measured example. A small model was
+    fine-tuned on the same small set of documents at 1, 3, and 10 epochs:
+  </p>
+  <ul>
+    <li><b>1 epoch:</b> answers were somewhat error-prone but varied and engaged with the actual source content.</li>
+    <li><b>3 epochs:</b> barely different — the loss number improved by about 1%.</li>
+    <li><b>10 epochs:</b> the model collapsed onto the exact same short, generic sentence for every question, regardless of what was actually asked.</li>
+  </ul>
+  <figure class="fig">
+    <div style="position:relative;height:240px;min-width:520px"><canvas id="chart-overfit"></canvas></div>
+    <figcaption><i>Illustrative</i> curves. Loss on the training data keeps falling; loss on text the model hasn't seen bottoms out and climbs again. Stop near the lowest point of the orange line.</figcaption>
+  </figure>
+  <p>
+    That last outcome is <b>overfitting</b>: instead of learning general
+    patterns from the documents, the model started memorizing a narrow,
+    safe response that happened to score well on that one small training
+    set, at the cost of actually engaging with new questions. It's the AI
+    equivalent of a student memorizing yesterday's exact quiz answers
+    instead of understanding the subject — looks fine on that quiz, falls
+    apart on any real question. More training only helps up to a point,
+    and that point depends heavily on how much data you actually have.
+  </p>
+</div>
+
+<div class="card" id="finetuning" style="margin-top:1rem">
+  <h3>7. Fine-tuning and LoRA</h3>
+  <p>
+    Training a model completely from scratch needs enormous amounts of data
+    and compute. <b>Fine-tuning</b> instead starts from an already-trained
+    model and nudges it a bit further using your own, much smaller dataset
+    — cheaper, and it keeps everything the model already knew.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 980 215" role="img" aria-label="LoRA: frozen weight matrix plus small trainable matrices">
+      <g font-size="13" text-anchor="middle">
+        <rect x="20" y="30" width="150" height="150" rx="6" fill="#1d2330" stroke="#9aa0ad"/>
+        <g stroke="#2a2e3a">
+          <line x1="20" y1="60" x2="170" y2="60"/><line x1="20" y1="90" x2="170" y2="90"/><line x1="20" y1="120" x2="170" y2="120"/><line x1="20" y1="150" x2="170" y2="150"/>
+          <line x1="50" y1="30" x2="50" y2="180"/><line x1="80" y1="30" x2="80" y2="180"/><line x1="110" y1="30" x2="110" y2="180"/><line x1="140" y1="30" x2="140" y2="180"/>
+        </g>
+        <text x="95" y="20" fill="#9aa0ad">W (original weights)</text>
+        <text x="95" y="198" fill="#9aa0ad" font-size="11">frozen — millions of numbers</text>
+        <text x="205" y="112" fill="#e6e6e6" font-size="24">+</text>
+        <rect x="240" y="30" width="22" height="150" rx="4" fill="#0f1a12" stroke="#34c759"/>
+        <text x="251" y="20" fill="#34c759">B</text>
+        <text x="282" y="112" fill="#e6e6e6" font-size="20">×</text>
+        <rect x="300" y="94" width="150" height="22" rx="4" fill="#0f1a12" stroke="#34c759"/>
+        <text x="375" y="88" fill="#34c759">A</text>
+        <text x="345" y="150" fill="#34c759" font-size="11">trainable — under 1% of the size</text>
+        <text x="490" y="112" fill="#e6e6e6" font-size="24">=</text>
+        <rect x="530" y="30" width="150" height="150" rx="6" fill="#1d2a24" stroke="#34c759"/>
+        <text x="605" y="20" fill="#e6e6e6">adapted layer</text>
+      </g>
+      <g font-size="12.5" fill="#9aa0ad">
+        <text x="710" y="60">sft: every weight in W changes</text>
+        <text x="710" y="80">(default for the small models here)</text>
+        <text x="710" y="120">lora: W stays frozen, only the</text>
+        <text x="710" y="140">thin A and B are trained and saved</text>
+        <text x="710" y="160">as a small separate file</text>
+      </g>
+    </svg>
+    <figcaption><i>Illustrative.</i> LoRA trains two thin matrices whose product is added to a frozen layer.</figcaption>
+  </figure>
+  <p>
+    <b>LoRA</b> (Low-Rank Adaptation) makes fine-tuning even cheaper: instead
+    of nudging all of a model's weights (hundreds of millions of numbers),
+    it freezes the original model completely and trains a small set of
+    extra numbers "alongside" a few chosen layers — in this project,
+    typically well under 1% of the model's total parameters. Those extra
+    numbers get combined with the original weights at inference time. It's
+    much faster to train and produces a tiny extra file instead of a whole
+    new copy of the model, at some cost in how much the model can actually
+    absorb compared to fully retraining every weight.
+  </p>
+  <p class="muted">See it live: pick <b>Method = lora</b> on <a href="/ui/train-folder">Train from Folder</a> (the default <b>sft</b> retrains every weight, which suits the small models offered there). The Weights page graph then shows which layers carry the LoRA adapter.</p>
+</div>
+
+<div class="card" id="dataquality" style="margin-top:1rem">
+  <h3>8. Training data quality: a real, measured finding</h3>
+  <p>
+    This project ran a long series of real experiments trying to fix one
+    specific, persistent problem: a small fine-tuned model kept misspelling
+    a name ("Nicodemo" as "Nicodmo"/"Nicodamo") and giving vague or
+    inaccurate answers, no matter what. Each lever that seemed like it
+    should help was tried and measured:
+  </p>
+  <ul>
+    <li><b>More training epochs</b> (1 → 3 → 10): barely moved the loss number, and 10 epochs actually made answers worse (see Overfitting above).</li>
+    <li><b>More source documents</b> (7 → 49 files, ~9x more data): richer RAG retrieval, but the same model still misspelled the name and got confused mixing multiple retrieved passages together.</li>
+    <li><b>Constraining the sampling</b> (limiting the model to its more-likely next-word choices): a real, measurable fluency improvement, but the specific spelling tic survived even this.</li>
+  </ul>
+  <figure class="fig">
+    <svg viewBox="0 0 900 150" role="img" aria-label="Distillation: raw chunk to cloud model to clean question answer pair to small model">
+      <g font-size="12" text-anchor="middle">
+        <rect x="10" y="40" width="200" height="70" rx="8" fill="#1d2330"/><text x="110" y="64" fill="#e6e6e6">raw OCR'd chunk</text><text x="110" y="84" fill="#9aa0ad" font-size="10.5">"…y Nicodemo dijo a los</text><text x="110" y="98" fill="#9aa0ad" font-size="10.5">sacer- dotes que…"</text>
+        <rect x="250" y="40" width="170" height="70" rx="8" fill="#171a21" stroke="#4da3ff"/><text x="335" y="70" fill="#4da3ff">stronger model</text><text x="335" y="88" fill="#9aa0ad" font-size="10.5">(build time only)</text>
+        <rect x="460" y="30" width="230" height="90" rx="8" fill="#0f1a12" stroke="#34c759"/><text x="575" y="56" fill="#34c759">clean Q &amp; A pair</text><text x="575" y="78" fill="#cfd5df" font-size="10.5">Q: ¿Qué dijo Nicodemo a los</text><text x="575" y="92" fill="#cfd5df" font-size="10.5">sacerdotes? A: …</text>
+        <rect x="730" y="40" width="160" height="70" rx="8" fill="#1d2330"/><text x="810" y="70" fill="#e6e6e6">small model</text><text x="810" y="88" fill="#9aa0ad" font-size="10.5">fine-tuned on pairs</text>
+      </g>
+      <g stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"><line x1="212" y1="75" x2="246" y2="75"/><line x1="422" y1="75" x2="456" y2="75"/><line x1="692" y1="75" x2="726" y2="75"/></g>
+    </svg>
+    <figcaption><i>Illustrative.</i> Distillation: a stronger model writes clean training examples once, and the small model learns from those instead of messy raw text.</figcaption>
+  </figure>
+  <p>
+    What actually fixed it: instead of training on the raw document text (which is only ever OCR'd book pages, not clean writing) or a cheap
+    heuristic ("treat a chunk's first sentence as the question, the rest as
+    the answer" — frequently mismatched, nonsensical, or ungrammatical),
+    a stronger cloud AI model was asked to read each document chunk and
+    write one genuine, accurate question and answer about it. The exact
+    same small model, fine-tuned on those cloud-written question/answer
+    pairs instead, produced the name spelled correctly in every single test
+    run — something none of the epoch, data-size, or sampling changes ever
+    achieved — plus noticeably more detailed, accurate answers.
+  </p>
+  <p>
+    The lesson generalizes well beyond this one project: a small model's
+    biggest limitation usually isn't how long you train it or how much raw
+    data you throw at it — it's whether what you're training it on is
+    actually clean, correct, well-formed text. This technique (using a
+    stronger model to generate better training examples for a smaller one)
+    is called <b>distillation</b>.
+  </p>
+  <p class="muted">See it live: enable a cloud AI provider on <a href="/ui/settings">Settings</a>, then pick "cloud_qa" as the dataset format on <a href="/ui/train-folder">Train from Folder</a> — each document chunk then gets a real, cloud-written question/answer pair instead of the cheap heuristic (costs one API call per chunk). The cloud is used only while building the dataset; answering stays local.</p>
+</div>
+
+<div class="card" id="rag" style="margin-top:1rem">
+  <h3>9. RAG: Retrieval-Augmented Generation</h3>
+  <p>
+    A model's knowledge is frozen at training time and limited by how much
+    it could actually memorize (see overfitting above — small models
+    struggle to memorize much reliably). <b>RAG</b> works around this: instead
+    of relying on the model to "remember" your documents, it searches your
+    actual documents for relevant passages <i>at the moment you ask a
+    question</i>, and pastes those passages directly into the model's
+    prompt as reference material. The model still writes the answer, but
+    now it's writing with your real text in front of it instead of from
+    memory — which is why grounding answers in retrieval scales far better
+    than trying to train a small model to memorize everything.
+  </p>
+  <figure class="fig">
+    <svg viewBox="0 0 980 250" role="img" aria-label="RAG flow: question, lexical and semantic search, rerank, top passages, prompt, local model, answer with sources">
+      <g font-size="12" text-anchor="middle">
+        <rect x="10" y="100" width="120" height="50" rx="8" fill="#1d2330"/><text x="70" y="122" fill="#e6e6e6">your question</text><text x="70" y="138" fill="#9aa0ad" font-size="10.5">"¿Quién era Zelomi?"</text>
+        <rect x="170" y="40" width="160" height="50" rx="8" fill="#1d3a5c"/><text x="250" y="62" fill="#e6e6e6">lexical (TF-IDF)</text><text x="250" y="78" fill="#9aa0ad" font-size="10.5">shared words</text>
+        <rect x="170" y="160" width="160" height="50" rx="8" fill="#1d4a3a"/><text x="250" y="182" fill="#e6e6e6">semantic (embeddings)</text><text x="250" y="198" fill="#9aa0ad" font-size="10.5">similar meaning</text>
+        <rect x="370" y="100" width="130" height="50" rx="8" fill="#4a3a1d"/><text x="435" y="122" fill="#e6e6e6">rerank</text><text x="435" y="138" fill="#9aa0ad" font-size="10.5">careful re-score</text>
+        <g>
+          <rect x="540" y="78" width="130" height="94" rx="8" fill="#171a21" stroke="#2a2e3a"/>
+          <text x="605" y="96" fill="#9aa0ad" font-size="10.5">top 3 passages</text>
+          <rect x="552" y="104" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+          <rect x="552" y="125" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+          <rect x="552" y="146" width="106" height="16" rx="3" fill="#0f1a12" stroke="#34c759"/>
+        </g>
+        <rect x="710" y="100" width="120" height="50" rx="8" fill="#171a21" stroke="#4da3ff"/><text x="770" y="122" fill="#4da3ff">local model</text><text x="770" y="138" fill="#9aa0ad" font-size="10.5">reads + writes</text>
+        <rect x="860" y="85" width="110" height="80" rx="8" fill="#0f1a12" stroke="#34c759"/><text x="915" y="112" fill="#e6e6e6">answer</text><text x="915" y="130" fill="#34c759" font-size="10.5">+ sources</text><text x="915" y="148" fill="#9aa0ad" font-size="10">or "not in the docs"</text>
+      </g>
+      <g fill="none" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)">
+        <path d="M130 118 L166 70"/><path d="M130 132 L166 180"/><path d="M332 65 L368 115"/><path d="M332 185 L368 135"/><line x1="502" y1="125" x2="536" y2="125"/><line x1="672" y1="125" x2="706" y2="125"/><line x1="832" y1="125" x2="856" y2="125"/>
+      </g>
+      <text x="490" y="235" fill="#9aa0ad" font-size="11.5" text-anchor="middle">All of this happens for every question, in a few seconds; then the model spends most of the time writing the answer.</text>
+    </svg>
+    <figcaption>How a grounded Chat answer is produced in this engine.</figcaption>
+  </figure>
+  <p>This engine's retrieval combines three techniques:</p>
+  <ul>
+    <li><b>Lexical search (TF-IDF):</b> finds passages sharing actual words with your question. Fast, but misses passages that mean the same thing using different words.</li>
+    <li><b>Semantic search (embeddings):</b> finds passages with related <i>meaning</i>, even with no shared words at all — this is where the vectors from section 3 get used for real.</li>
+    <li><b>Reranking:</b> after gathering candidates from both of the above, a second, more careful model reads the question and each candidate passage together and re-scores them, since checking a pair directly is more accurate than comparing two vectors from a distance.</li>
+  </ul>
+  <p class="muted">See it live: build a searchable index of your own documents on <a href="/ui/train-folder">Train from Folder</a>, connect it on <a href="/ui/models">Models</a>, and chat with it grounded (see <a href="#start">Start here</a>).</p>
+</div>
+
+<div class="card" id="hardware" style="margin-top:1rem">
+  <h3>10. CPU vs GPU vs NPU</h3>
+  <p>
+    A model's real work is almost entirely large grids of numbers being
+    multiplied together. A <b>CPU</b> does this with a handful of parallel
+    lanes per core — flexible, but not built for this specific job. A
+    <b>GPU</b> has thousands of small cores built specifically for doing
+    huge numbers of these multiplications at once, which is why GPUs are
+    typically an order of magnitude faster for both training and chat
+    responses. An <b>NPU</b> (found in newer "AI PC" chips) is a further
+    specialized chip for this same kind of math, but — at least on this
+    project's hardware, verified directly rather than assumed — it's
+    inference-only (it can never train a model) and its benefit only shows
+    up under sustained, batched workloads; for one-off single questions,
+    the overhead of using it can actually make things slower than the CPU.
+  </p>
+</div>
+
+<!-- ───────────────────────────── TROUBLESHOOTING ───────────────────────────── -->
+<div class="card" id="trouble" style="margin-top:1rem">
+  <h3>Troubleshooting: common first-time problems</h3>
+  <table>
+    <thead><tr><th style="width:32%">What you see</th><th>Likely cause → what to do</th></tr></thead>
+    <tbody>
+      <tr><td>The job finishes almost instantly with very few rows</td><td>The PDFs are scans without a text layer and OCR is off. Check the OCR card on Train from Folder, or export the documents as text.</td></tr>
+      <tr><td>Chat answers from general knowledge and ignores my documents</td><td>The corpus isn't connected, or Grounded mode is off. Recheck steps 4 and 5 of <a href="#start">Start here</a>.</td></tr>
+      <tr><td>"Not in the documents" for a question that <i>is</i> covered</td><td>Retrieval missed the passage. Rephrase with words the document uses, check names are spelled as in the text, or run <b>Evaluate a RAG corpus</b>. Paragraph chunking helps.</td></tr>
+      <tr><td>Answers are cut short or incomplete</td><td>The engine already uses the <i>complete</i> answer style by default (setting <kbd>local_prompt_style</kbd>); if it was changed to a brief style, set it back. Measured: "be brief" answers looked wrong because they left out half the facts.</td></tr>
+      <tr><td>The model I trained writes gibberish or repeats one sentence</td><td>Expected for tiny models (minilm, gpt2) and for too many epochs (section 6). Use it to learn; use the 7B answering model plus retrieval for real answers.</td></tr>
+      <tr><td>Training would take many hours</td><td>Lower <b>Max rows</b> (rows are sampled evenly across all files), keep <kbd>gpt2</kbd>, keep 1 epoch. Qwen 0.5B trains about 40x slower.</td></tr>
+      <tr><td>The job stops with a memory warning</td><td>Close other programs, or lower Max rows / Max seq. A rough RAM check runs before each job.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" id="glossary" style="margin-top:1rem">
+  <h3>11. Glossary (quick reference)</h3>
+  <table>
+    <tbody>
+      <tr><td><b>Token</b></td><td>A small chunk of text (word/part of a word) represented as a number.</td></tr>
+      <tr><td><b>Embedding</b></td><td>A list of numbers representing a token or piece of text's meaning as a point in space.</td></tr>
+      <tr><td><b>Weights</b></td><td>The adjustable numbers inside a model that get changed during training.</td></tr>
+      <tr><td><b>Loss</b></td><td>A single number measuring how wrong the model's predictions currently are — training tries to make this smaller.</td></tr>
+      <tr><td><b>Epoch</b></td><td>One full pass through the entire training dataset.</td></tr>
+      <tr><td><b>Step</b></td><td>One single weight update, based on one batch of examples.</td></tr>
+      <tr><td><b>Batch size</b></td><td>How many examples are shown to the model before one weight update.</td></tr>
+      <tr><td><b>Fine-tuning</b></td><td>Continuing to train an already-trained model on your own smaller dataset.</td></tr>
+      <tr><td><b>SFT</b></td><td>Supervised fine-tuning: retraining all of a model's weights on your data (the default Method for the small models here).</td></tr>
+      <tr><td><b>LoRA</b></td><td>A cheap fine-tuning method that trains a small add-on instead of the whole model.</td></tr>
+      <tr><td><b>Overfitting</b></td><td>A model memorizing its training data too narrowly instead of learning general patterns.</td></tr>
+      <tr><td><b>RAG</b></td><td>Answering questions using passages retrieved from real documents instead of relying on memorized training data.</td></tr>
+      <tr><td><b>Grounded</b></td><td>A Chat answer written from retrieved passages, with sources, that refuses when the documents don't cover the question.</td></tr>
+      <tr><td><b>Chunk</b></td><td>A slice of a document, small enough to search and feed to a model as one piece.</td></tr>
+      <tr><td><b>Corpus</b></td><td>A named collection of ingested documents with a built search index (named after the Train from Folder job).</td></tr>
+      <tr><td><b>OCR</b></td><td>Optical character recognition: reading the text out of scanned pages and images.</td></tr>
+      <tr><td><b>Reranking</b></td><td>Re-scoring a shortlist of retrieved passages with a more careful (but slower) model.</td></tr>
+      <tr><td><b>Quantization</b></td><td>Storing a model's weights with less precision to save memory/speed, at some accuracy cost (the local 7B model uses 4-bit "Q4_K_M").</td></tr>
+      <tr><td><b>Distillation</b></td><td>Using a stronger AI model to generate better training examples for a smaller one — see section 8, a real fix found in this project's own testing.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" id="map" style="margin-top:1rem">
+  <h3>12. Where things live in this app</h3>
+  <table>
+    <thead><tr><th>Concept</th><th>Where to use it</th></tr></thead>
+    <tbody>
+      <tr><td>Chat with a model</td><td><a href="/ui/chat">Chat</a></td></tr>
+      <tr><td>See/register models, wire a model to a RAG corpus</td><td><a href="/ui/models">Models</a></td></tr>
+      <tr><td>Inspect real weight tables, see the network graph</td><td><a href="/ui/weights">Weights</a></td></tr>
+      <tr><td>Fine-tune (SFT or LoRA) on a plain dataset file</td><td><a href="/ui/training">Training</a></td></tr>
+      <tr><td>Point at a folder of documents: extract, chunk, fine-tune, build a RAG index, all in one job</td><td><a href="/ui/train-folder">Train from Folder</a></td></tr>
+      <tr><td>Measure how well retrieval finds the right passage</td><td>"Evaluate a RAG corpus" on <a href="/ui/train-folder">Train from Folder</a></td></tr>
+      <tr><td>Generate better training data via a cloud AI provider (distillation)</td><td>"cloud_qa" format on <a href="/ui/train-folder">Train from Folder</a>, needs a provider enabled on <a href="/ui/settings">Settings</a></td></tr>
+      <tr><td>Grounded mode and how many passages each answer reads (top-k)</td><td><a href="/ui/settings">Settings</a></td></tr>
+      <tr><td>Enable/configure a cloud AI provider (Anthropic, OpenAI, Ollama Cloud) for chat or RAG</td><td><a href="/ui/settings">Settings</a></td></tr>
+      <tr><td>Explore people, places and links extracted from your documents</td><td><a href="/ui/kgraph">Knowledge Graph</a></td></tr>
+      <tr><td>Autonomous research/data-gathering</td><td><a href="/ui/agent">Agent</a></td></tr>
+      <tr><td>External tool access (MCP protocol)</td><td><a href="/ui/mcp">MCP</a></td></tr>
+      <tr><td>Manage ingested files/datasets/checkpoints</td><td><a href="/ui/storage">Storage</a></td></tr>
+      <tr><td>Spread training across multiple machines</td><td><a href="/ui/cluster">Cluster</a></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function(){
+  // ── charts (Chart.js is loaded by _layout.html; degrade quietly if the CDN is unreachable offline)
+  if (window.Chart) {
+    Chart.defaults.color = '#9aa0ad';
+    Chart.defaults.borderColor = '#2a2e3a';
+    const paths = document.getElementById('chart-paths');
+    if (paths) new Chart(paths, {
+      type: 'bar',
+      data: {
+        labels: ['Qwen 0.5B', 'Qwen 1.5B', 'Qwen 3B', 'Qwen 7B (short prompt)', 'Qwen 7B ("complete" prompt) — default'],
+        datasets: [{ label: 'fully correct', data: [4, 28, 36, 44, 67],
+          backgroundColor: ['#3a4256', '#3a4256', '#3a4256', '#2f6aa8', '#34c759'], borderRadius: 6 }]
+      },
+      options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => c.raw + '% fully correct' } } },
+        scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+    });
+    const of = document.getElementById('chart-overfit');
+    if (of) {
+      const ep = [...Array(13).keys()];
+      new Chart(of, {
+        type: 'line',
+        data: { labels: ep.map(e => 'epoch ' + e), datasets: [
+          { label: 'loss on training text', data: ep.map(e => +(3.2 * Math.exp(-e / 3) + 0.25).toFixed(2)), borderColor: '#4da3ff', tension: .35, pointRadius: 0 },
+          { label: 'loss on unseen text', data: ep.map(e => +(3.25 * Math.exp(-e / 2.6) + 0.9 + 0.035 * e * e).toFixed(2)), borderColor: '#ff9500', tension: .35, pointRadius: 0 }
+        ]},
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, title: { display: true, text: 'loss (lower is better)' } } } }
+      });
+    }
+  } else {
+    document.querySelectorAll('#chart-paths, #chart-overfit').forEach(c => c.replaceWith(Object.assign(document.createElement('p'),
+      { className: 'muted', textContent: 'Chart unavailable offline (Chart.js is loaded from a CDN). Measured values: 0.5B 4%, 1.5B 28%, 3B 36%, 7B 44% → 67% with the "complete" prompt.' })));
+  }
+
+  // ── chunking playground: same rules as src/ingestion/pipeline.py (chunk_text / _structured / _paragraphs)
+  const SAMPLE = `Las ruinas de la antigua ciudad estaban cubiertas de arena. Los viajeros llegaron al amanecer, cansados después de tres días de camino. Nadie había entrado en el templo desde hacía siglos.
+
+El guía, un anciano llamado Zelomi, conocía cada piedra del lugar. Contó que su abuelo había visto las puertas abiertas una sola vez. Aquella noche, dijo, se escucharon cantos que venían de debajo de la tierra.
+
+The travellers set up camp beside the eastern wall. One of them, a young scribe, began copying the inscriptions by lamplight. Most of the text was worn away, but a few names could still be read clearly.
+
+Al día siguiente encontraron una escalera oculta bajo el altar. Bajaron con antorchas y cuerdas. Al final de la escalera había una sala llena de rollos, perfectamente conservados por el aire seco del desierto.`;
+  const $ = id => document.getElementById(id);
+  const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const COLORS = ['#16263a', '#16301f', '#33281a', '#2a1a33', '#1a2f33', '#33201a'];
+
+  function windowChunks(t, size, overlap) {
+    const out = [], step = Math.max(1, size - overlap);
+    for (let s = 0; s < t.length; s += step) { const p = t.slice(s, s + size).trim(); if (p) out.push({ text: p, ov: s > 0 ? Math.min(overlap, p.length) : 0 }); }
+    return out;
+  }
+  function structuredChunks(t, size, ovSent) {
+    const sents = t.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean), out = [];
+    let cur = [], len = 0, carried = 0;
+    const flush = () => { if (cur.length) out.push({ text: cur.join(' '), ov: carried ? cur.slice(0, carried).join(' ').length : 0 }); };
+    for (const s of sents) {
+      if (s.length > size) { flush(); cur = []; len = 0; carried = 0; for (let i = 0; i < s.length; i += size) out.push({ text: s.slice(i, i + size), ov: 0 }); continue; }
+      if (cur.length && len + s.length + 1 > size) { flush(); cur = ovSent ? cur.slice(-ovSent) : []; carried = cur.length; len = cur.reduce((a, x) => a + x.length + 1, 0); }
+      cur.push(s); len += s.length + 1;
+    }
+    flush(); return out;
+  }
+  function paragraphChunks(t, size) {
+    const paras = t.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean), out = [];
+    let cur = [], len = 0;
+    const flush = () => { if (cur.length) out.push({ text: cur.join('\n\n'), ov: 0 }); };
+    for (const p of paras) {
+      if (p.length > size) { flush(); cur = []; len = 0; structuredChunks(p, size, 1).forEach(c => out.push(c)); continue; }
+      if (cur.length && len + p.length + 2 > size) { flush(); cur = []; len = 0; }
+      cur.push(p); len += p.length + 2;
+    }
+    flush(); return out;
+  }
+  function render() {
+    const t = $('lab-text').value, size = +$('lab-size').value, mode = $('lab-mode').value;
+    $('lab-size-v').textContent = size;
+    if (!t.trim()) { $('lab-out').innerHTML = ''; $('lab-stats').textContent = 'Paste text or click "Load sample text".'; return; }
+    const chunks = mode === 'window' ? windowChunks(t, size, Math.round(size * 150 / 1200))
+                 : mode === 'structured' ? structuredChunks(t, size, 1) : paragraphChunks(t, size);
+    const cut = chunks.filter(c => /[A-Za-zÁÉÍÓÚáéíóúñÑ]$/.test(c.text) && !/[.!?]$/.test(c.text)).length;
+    $('lab-stats').innerHTML = `<span class="stat"><b>${chunks.length}</b> chunks</span><span class="stat">avg <b>${Math.round(chunks.reduce((a, c) => a + c.text.length, 0) / chunks.length)}</b> chars</span><span class="stat"><b style="color:${cut ? 'var(--warn)' : 'var(--ok)'}">${cut}</b> end mid-sentence</span>` +
+      (mode === 'window' ? '<span class="stat">overlap ' + Math.round(size * 150 / 1200) + ' chars (scaled from 150 per 1200)</span>' : '');
+    $('lab-out').innerHTML = chunks.map((c, i) => {
+      const ov = c.ov ? '<span class="ov">' + esc(c.text.slice(0, c.ov)) + '</span>' + esc(c.text.slice(c.ov)) : esc(c.text);
+      return `<div class="chunk" style="background:${COLORS[i % COLORS.length]}"><b>chunk ${i + 1} · ${c.text.length} chars</b>${ov}</div>`;
+    }).join('');
+  }
+  window.labSample = () => { $('lab-text').value = SAMPLE; render(); };
+  ['lab-text', 'lab-size', 'lab-mode'].forEach(id => $(id).addEventListener('input', render));
+  labSample();
+})();
+</script>
+{% endblock %}

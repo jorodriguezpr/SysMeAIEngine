@@ -1,0 +1,172 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Settings · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<div class="card">
+  <h3>Chat grounding (answer from your documents)</h3>
+  <p class="muted">
+    <strong>Grounded mode</strong> retrieves passages from your ingested
+    documents (RAG indexes + knowledge graph) <em>before</em> generating, so
+    chat answers come from your actual documents instead of the model's
+    weights. This is the fix for "the model can't answer from my books".
+    Plain mode is the old weights-only behavior. Retrieval upgrades:
+    <em>multi-query</em> rewrites the question several ways (needs the cloud
+    provider enabled below), <em>parent-child</em> widens each hit to its
+    surrounding passage, and the knowledge graph adds entity/relation facts
+    (build a graph on the <a href="/ui/kgraph">Knowledge Graph</a> page).
+  </p>
+
+  <div class="row">
+    <label>Chat mode
+      <select id="chat_mode">
+        <option value="grounded" {% if grounding.chat_mode == 'grounded' %}selected{% endif %}>Grounded (retrieve from documents first)</option>
+        <option value="plain" {% if grounding.chat_mode == 'plain' %}selected{% endif %}>Plain (model weights only — old behavior)</option>
+      </select>
+    </label>
+    <label class="muted">passages per turn <input id="chat_top_k" type="number" min="1" max="20" value="{{ grounding.chat_top_k }}" style="width:4em"></label>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label class="muted"><input id="chat_multi_query" type="checkbox" {% if grounding.chat_multi_query %}checked{% endif %}> Multi-query expansion (rewrite the question 2–3 ways before searching)</label>
+  </div>
+  <div class="row">
+    <label class="muted"><input id="chat_kgraph" type="checkbox" {% if grounding.chat_kgraph %}checked{% endif %}> Use knowledge graph facts when a graph is built</label>
+  </div>
+  <div class="row">
+    <label class="muted"><input id="grounded_use_cloud" type="checkbox" {% if grounding.grounded_use_cloud %}checked{% endif %}> Let the cloud provider write the final grounded answer (falls back to the local model)</label>
+  </div>
+  <div class="row">
+    <label class="muted"><input id="grounded_refuse_when_empty" type="checkbox" {% if grounding.grounded_refuse_when_empty %}checked{% endif %}> Refuse when retrieval finds nothing (instead of answering from weights)</label>
+  </div>
+
+  <div class="row" style="margin-top:.8rem">
+    <button class="primary" onclick="saveGrounding()">Save grounding</button>
+    <span id="gstatus" class="muted"></span>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Cloud AI provider</h3>
+  <p class="muted">
+    Optional: route chat/RAG generation to a cloud AI provider instead of the
+    local model. When enabled, the <a href="/ui/chat">Chat</a> page's "Use
+    cloud AI provider" checkbox (and any API caller passing
+    <code>use_cloud: true</code>) uses this here — for RAG chat, local
+    retrieval still happens exactly as before, only the final answer gets
+    written by the cloud model instead of the local one. Keys are stored
+    locally in plain text on this machine, same as this engine's other local
+    settings (registry.json, ENGINE_API_KEY) -- do not use this on a shared
+    or multi-user machine without understanding that.
+  </p>
+
+  <div class="row">
+    <label class="muted"><input id="enabled" type="checkbox" {% if settings.enabled %}checked{% endif %}> Enabled by default</label>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label>Provider
+      <select id="provider">
+        <option value="anthropic" {% if settings.provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+        <option value="openai" {% if settings.provider == 'openai' %}selected{% endif %}>OpenAI</option>
+        <option value="ollama_cloud" {% if settings.provider == 'ollama_cloud' %}selected{% endif %}>Ollama Cloud</option>
+      </select>
+    </label>
+    <label>Model
+      <input id="model" value="{{ settings.model }}" placeholder="the provider's model id, e.g. gpt-4o or llama3.1" style="min-width:220px">
+    </label>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label>API key
+      <input id="api_key" type="password" placeholder="{% if settings.api_key_set %}(saved -- leave blank to keep it){% else %}not set{% endif %}" style="min-width:260px">
+    </label>
+    <span class="pill {% if settings.api_key_set %}ok{% endif %}">{% if settings.api_key_set %}key set ({{ settings.api_key }}){% else %}no key set{% endif %}</span>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label>Base URL override <span class="muted">(optional -- leave blank for the provider's default)</span>
+      <input id="base_url" value="{{ settings.base_url }}" placeholder="https://api.anthropic.com" style="min-width:260px">
+    </label>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label class="muted" style="flex:1;min-width:280px">System prompt / customization
+      <textarea id="system_prompt" rows="3" style="width:100%" placeholder="e.g. Always answer in Spanish. You are a theology research assistant grounded in the ingested apocryphal texts.">{{ settings.system_prompt }}</textarea>
+    </label>
+  </div>
+
+  <div class="row" style="margin-top:.6rem">
+    <label class="muted">temperature <input id="temperature" type="number" step="0.1" value="{{ settings.temperature }}" style="width:5em"></label>
+    <label class="muted">max_tokens <input id="max_tokens" type="number" value="{{ settings.max_tokens }}" style="width:6em"></label>
+  </div>
+
+  <div class="row" style="margin-top:.8rem">
+    <button class="primary" onclick="saveSettings()">Save</button>
+    <span id="status" class="muted"></span>
+  </div>
+</div>
+
+<script>
+async function saveGrounding(){
+  const body = {
+    chat_mode: document.getElementById('chat_mode').value,
+    chat_top_k: parseInt(document.getElementById('chat_top_k').value),
+    chat_multi_query: document.getElementById('chat_multi_query').checked,
+    chat_kgraph: document.getElementById('chat_kgraph').checked,
+    grounded_use_cloud: document.getElementById('grounded_use_cloud').checked,
+    grounded_refuse_when_empty: document.getElementById('grounded_refuse_when_empty').checked,
+  };
+  const status = document.getElementById('gstatus');
+  status.textContent = 'Saving…';
+  const r = await fetch('/api/settings/grounding', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  if(!r.ok){ status.textContent = 'Failed: ' + (await r.text()); return; }
+  status.textContent = 'Saved.';
+}
+
+async function saveSettings(){
+  const body = {
+    enabled: document.getElementById('enabled').checked,
+    provider: document.getElementById('provider').value,
+    model: document.getElementById('model').value,
+    api_key: document.getElementById('api_key').value,  // "" means "keep existing" server-side
+    base_url: document.getElementById('base_url').value,
+    system_prompt: document.getElementById('system_prompt').value,
+    temperature: parseFloat(document.getElementById('temperature').value),
+    max_tokens: parseInt(document.getElementById('max_tokens').value),
+  };
+  const status = document.getElementById('status');
+  status.textContent = 'Saving…';
+  const r = await fetch('/api/settings/cloud', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  if(!r.ok){ status.textContent = 'Failed: ' + (await r.text()); return; }
+  location.reload();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,154 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Training · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Training</h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Datasets</h3>
+    <ul>
+      {% for d in datasets %}
+      <li>{{ d.name }} <span class="muted">({{ (d.size/1024)|round(1) }} KB)</span></li>
+      {% else %}
+      <li class="muted">No datasets yet — run <code>ingest build-dataset</code>.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Raw documents</h3>
+    <ul>
+      {% for f in raw_files %}<li>{{ f }}</li>{% else %}<li class="muted">—</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Chunk files</h3>
+    <ul>
+      {% for f in chunks_files %}<li>{{ f }}</li>{% else %}<li class="muted">—</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Start fine-tuning</h3>
+  <form id="ft" onsubmit="return startFT(event)">
+    <div class="row">
+      <label>Model <input name="model" value="{{ config.default_model }}"></label>
+      <label>Dataset
+        <select name="dataset">
+          {% for d in datasets %}<option>{{ d.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Method
+        <select name="method">
+          <option value="sft">sft (full)</option>
+          <option value="lora" selected>lora</option>
+          <option value="qlora">qlora</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <label>Epochs <input name="epochs" type="number" value="1" style="width:5em"></label>
+      <label>LR <input name="lr" type="number" step="0.0001" value="0.0002" style="width:7em"></label>
+      <label>Batch <input name="batch_size" type="number" value="1" style="width:5em"></label>
+      <button class="primary">Start</button>
+    </div>
+  </form>
+  <div id="ft-result" class="muted"></div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Jobs</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Started</th><th>Status</th><th>Args</th><th>Log</th></tr></thead>
+    <tbody id="jobs-body">
+      {% for j in jobs %}
+      <tr>
+        <td>{{ j.id }}</td>
+        <td class="muted">{{ j.started_at }}</td>
+        <td>{{ j.status }}{% if j.progress %} <span class="muted">({{ j.progress.percent }}%, step {{ j.progress.current_step }}/{{ j.progress.total_steps }})</span>{% endif %}</td>
+        <td class="muted" style="font-size:.8rem">{{ j.args | tojson }}</td>
+        <td><a href="#" onclick="showLog('{{ j.id }}'); return false">view</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <pre id="joblog" style="display:none"></pre>
+</div>
+
+<script>
+async function startFT(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  body.epochs = parseInt(body.epochs);
+  body.lr = parseFloat(body.lr);
+  body.batch_size = parseInt(body.batch_size);
+  const r = await fetch('/api/train/finetune', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  document.getElementById('ft-result').textContent = r.ok ? ('job started: ' + j.job_id) : ('ERR ' + (j.detail || r.statusText));
+  if(r.ok) setTimeout(()=>location.reload(), 800);
+  return false;
+}
+async function showLog(id){
+  const r = await fetch('/api/train/jobs/' + id + '/log');
+  const j = await r.json();
+  const el = document.getElementById('joblog');
+  el.style.display = 'block';
+  el.textContent = j.log || '(empty)';
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function statusCell(j){
+  let s = j.status;
+  if(j.progress) s += ` <span class="muted">(${j.progress.percent}%, step ${j.progress.current_step}/${j.progress.total_steps})</span>`;
+  return s;
+}
+async function pollJobs(){
+  try{
+    const r = await fetch('/api/train/jobs');
+    const jobs = await r.json();
+    const body = document.getElementById('jobs-body');
+    if(!jobs.length){
+      body.innerHTML = '<tr><td colspan="5" class="muted">No jobs yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = jobs.map(j => `
+      <tr>
+        <td>${j.id}</td>
+        <td class="muted">${j.started_at || ''}</td>
+        <td>${statusCell(j)}</td>
+        <td class="muted" style="font-size:.8rem">${escapeHtml(JSON.stringify(j.args))}</td>
+        <td><a href="#" onclick="showLog('${escapeHtml(j.id)}'); return false">view</a></td>
+      </tr>
+    `).join('');
+  }catch(e){ /* transient fetch error -- next poll will retry */ }
+}
+setInterval(pollJobs, 4000);
+</script>
+{% endblock %}

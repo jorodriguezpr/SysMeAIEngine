@@ -1,0 +1,175 @@
+{#
+  SysMeAIEngine - Private AI Model Engine
+  Copyright 2026 Jose Rodriguez
+
+  Developer: Jose Rodriguez <jrpcone@gmail.com>
+  GitHub:    https://github.com/jorodriguezpr
+  Site:      https://microrepair.net
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+#}
+
+{% extends "_layout.html" %}
+{% block title %}Cluster · SysMeAIEngine{% endblock %}
+{% block content %}
+<h1>Cluster</h1>
+<p class="muted">
+  Distributed multi-node fine-tuning: this instance can act as the master
+  (rank 0) for a job that also runs on any other SysMeAIEngine instance
+  registered below. See <code>docs/CLUSTER.md</code> for setup (firewall,
+  <code>ENGINE_HOST</code>, matching torch versions) and honest limitations —
+  this hasn't been benchmarked on real separate machines with real GPUs, and
+  a slow node can bottleneck the whole synchronous training run.
+</p>
+
+<div class="card">
+  <h3>Nodes</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Host</th><th>Port</th><th></th><th></th></tr></thead>
+    <tbody>
+      {% for n in nodes %}
+      <tr>
+        <td>{{ n.name }}</td>
+        <td>{{ n.host }}</td>
+        <td>{{ n.port }}</td>
+        <td><button onclick="pingNode('{{ n.name }}')">Ping</button></td>
+        <td><button onclick="removeNode('{{ n.name }}')">Remove</button></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No nodes registered yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div id="ping-result" class="muted"></div>
+
+  <h4 style="margin-top:1rem">Add node</h4>
+  <form onsubmit="return addNode(event)">
+    <div class="row">
+      <label>Name <input name="name" required placeholder="laptop-a"></label>
+      <label>Host <input name="host" required placeholder="192.168.1.50"></label>
+      <label>Port <input name="port" type="number" value="11534" style="width:6em"></label>
+      <label>API key <input name="api_key" placeholder="(matches that node's ENGINE_API_KEY)"></label>
+      <button class="primary">Add</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Distributed fine-tune</h3>
+  <form onsubmit="return startCluster(event)">
+    <div class="row">
+      <label>Model <input name="model" placeholder="Qwen/Qwen2.5-0.5B-Instruct or a local checkpoint path"></label>
+      <label>Dataset
+        <select name="dataset">
+          {% for d in datasets %}<option>{{ d }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Method
+        <select name="method">
+          <option value="sft">sft (full)</option>
+          <option value="lora" selected>lora</option>
+          <option value="qlora">qlora</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <label>Epochs <input name="epochs" type="number" value="1" style="width:5em"></label>
+      <label>LR <input name="lr" type="number" step="0.0001" value="0.0002" style="width:7em"></label>
+      <label>Batch <input name="batch_size" type="number" value="1" style="width:5em"></label>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <span>Nodes (this instance is always rank 0):</span>
+      {% for n in nodes %}
+      <label><input type="checkbox" name="node" value="{{ n.name }}"> {{ n.name }}</label>
+      {% else %}
+      <span class="muted">register a node above first</span>
+      {% endfor %}
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <button class="primary">Launch distributed job</button>
+    </div>
+  </form>
+  <div id="cluster-result" class="muted"></div>
+</div>
+
+<div class="card" style="margin-top:1rem">
+  <h3>Cluster jobs</h3>
+  <table>
+    <thead><tr><th>Run</th><th>Started</th><th>Nodes</th><th></th></tr></thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr>
+        <td>{{ j.id }}</td>
+        <td class="muted">{{ j.started_at }}</td>
+        <td>{{ j.nodes | join(', ') }}</td>
+        <td><a href="#" onclick="showClusterStatus('{{ j.id }}'); return false">status</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No distributed jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <pre id="cluster-status" style="display:none"></pre>
+</div>
+
+<script>
+async function addNode(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  body.port = parseInt(body.port);
+  if(!body.api_key) delete body.api_key;
+  const r = await fetch('/api/cluster/nodes', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if(r.ok) location.reload(); else alert('ERR ' + (j.detail || r.statusText));
+  return false;
+}
+async function removeNode(name){
+  if(!confirm('Remove node ' + name + '?')) return;
+  await fetch('/api/cluster/nodes/' + encodeURIComponent(name), {method:'DELETE'});
+  location.reload();
+}
+async function pingNode(name){
+  const r = await fetch('/api/cluster/nodes/' + encodeURIComponent(name) + '/ping', {method:'POST'});
+  const j = await r.json();
+  document.getElementById('ping-result').textContent = name + ': ' + (j.reachable ? 'reachable' : ('unreachable — ' + j.detail));
+}
+async function startCluster(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    model: fd.get('model'), dataset: fd.get('dataset'), method: fd.get('method'),
+    epochs: parseInt(fd.get('epochs')), lr: parseFloat(fd.get('lr')), batch_size: parseInt(fd.get('batch_size')),
+    nodes: fd.getAll('node'),
+  };
+  if(body.nodes.length === 0){
+    document.getElementById('cluster-result').textContent = 'select at least one node';
+    return false;
+  }
+  const r = await fetch('/api/cluster/train', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  document.getElementById('cluster-result').textContent = r.ok ? ('launched: ' + j.id) : ('ERR ' + (j.detail || r.statusText));
+  if(r.ok) setTimeout(()=>location.reload(), 800);
+  return false;
+}
+async function showClusterStatus(id){
+  const r = await fetch('/api/cluster/jobs/' + id);
+  const j = await r.json();
+  const el = document.getElementById('cluster-status');
+  el.style.display = 'block';
+  el.textContent = JSON.stringify(j, null, 2);
+}
+</script>
+{% endblock %}

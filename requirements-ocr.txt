@@ -1,0 +1,14 @@
+# Optional: OCR for scanned (image-only) PDF pages and image files
+# (.png/.jpg/.tif/...) in Train from Folder. Without these, extraction
+# behaves exactly as before (text layer only; image files are ignored).
+#
+#   pip install -r requirements-ocr.txt
+#
+# rapidocr 3.x runs on whichever `onnxruntime` module is importable and does
+# NOT install one itself -- deliberately, since a plain `onnxruntime` wheel
+# conflicts with `onnxruntime-directml` (requirements-amd.txt). If neither
+# is installed yet, also run:  pip install onnxruntime
+# OCR models ship inside the rapidocr wheel (no download on first use).
+# Only the master node needs this: extraction never runs on cluster slaves.
+rapidocr>=3.0
+pypdfium2>=4.0

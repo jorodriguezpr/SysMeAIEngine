@@ -1,0 +1,66 @@
+# Core
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-dotenv>=1.0
+python-multipart>=0.0.9  # required for the cluster job-upload endpoint (Form/File)
+numpy>=1.26
+requests>=2.32
+tqdm>=4.66
+rich>=13
+
+# Metrics / system
+psutil>=5.9
+
+# Document ingestion
+pdfminer.six>=20220524
+beautifulsoup4>=4.12
+lxml>=5.2
+python-docx>=1.1     # .docx
+python-pptx>=0.6.23  # .pptx
+openpyxl>=3.1        # .xlsx
+
+# RAG retrieval index (TF-IDF + semantic)
+scikit-learn>=1.5
+sentence-transformers>=3.0
+
+# Models. CORRECTION (confirmed live on a real CUDA machine, see
+# docs/CLUSTER.md): a plain `pip install torch` resolved to a CPU-only build
+# (`torch.__version__` printed "...+cpu") even on a machine with a real
+# NVIDIA GPU — this project previously claimed the standard PyPI wheel
+# always includes CUDA support automatically, which turned out to be wrong.
+# For a CUDA-enabled build, install from PyTorch's own CUDA index instead:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# (or whichever CUDA tag matches your GPU driver — see https://pytorch.org
+# for the current selector). Do this BEFORE installing the rest of
+# requirements.txt, or reinstall torch afterward with the command above.
+torch>=2.3
+transformers>=4.43
+sentencepiece>=0.2
+safetensors>=0.4
+
+# Optional but commonly used
+datasets>=2.20
+accelerate>=0.33
+tiktoken>=0.7
+# LoRA/QLoRA fine-tuning. Was AMD-extras-only until target_modules was
+# hardcoded to Llama/Qwen-style names, which don't exist on gpt2 (this
+# project's default base model) -- now auto-detected per architecture
+# (src/core/finetune_plan.py), so LoRA is a real default-workflow feature.
+peft>=0.13
+
+# Agent self-evolve
+ddgs>=1.0  # duckduckgo-search was renamed/deprecated to this package
+readability-lxml>=0.8.1
+
+# Tests
+pytest>=8.2
+httpx>=0.27
+
+# NOTE — llama_cpp provider + CUDA: unlike torch, the PyPI `llama-cpp-python`
+# wheel is CPU-only by default. To actually offload GGUF layers to an NVIDIA
+# GPU (n_gpu_layers, wired in src/core/providers/llama_cpp.py), reinstall it
+# with CUDA enabled, e.g.:
+#   pip install llama-cpp-python --force-reinstall --no-cache-dir \
+#     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+# Not required for the hf/minilm providers — those already get CUDA for free.

@@ -1,0 +1,8 @@
+# Normalize text files; Windows scripts must keep CRLF (cmd.exe can misparse
+# labels/goto in LF-only .bat files, and a GitHub "Download ZIP" ships files as stored).
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.svg text

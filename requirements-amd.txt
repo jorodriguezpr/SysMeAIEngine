@@ -1,0 +1,49 @@
+# ── Optional AMD accelerators ─────────────────────────────────────────────────
+# Install these only if you have the matching hardware.
+# They are kept separate because the wheels are large and platform-specific.
+
+# AMD GPU via DirectML (no CUDA required) — for ONNX inference only (see
+# scripts/export_onnx.py). Verified end-to-end on real hardware (Radeon
+# 860M): correct (logits match CPU, argmax identical) but ~4.3x SLOWER than
+# CPU for this engine's actual workload — small models, single-sequence
+# greedy decoding, no batching, no KV-cache reuse, so GPU data-transfer and
+# kernel-launch overhead dominates the (small) amount of real compute. Not
+# recommended as a default; install only to experiment or if you have a
+# discrete GPU where the calculus may differ.
+onnxruntime-directml>=1.20
+onnxscript>=0.7      # required by scripts/export_onnx.py (torch.onnx.export)
+
+# NOTE: torch-directml was evaluated for GPU-accelerated TRAINING and
+# rejected — it silently downgrades torch to an incompatible pinned version
+# (breaking other dependencies) and produced loss=nan when training TinyGPT
+# on real hardware. Do not add it back without re-verifying both issues are
+# actually fixed upstream. See src/core/device_select.py.
+
+# AMD NPU (Ryzen AI) — the Vitis AI EP is NOT on public PyPI.
+# Install via the AMD Ryzen AI Software installer (sets up a dedicated conda env):
+#   https://ryzenai.docs.amd.com/en/latest/inst.html
+# After installing RAI, the runtime exposes "onnxruntime" + vitis EP automatically.
+# Given the DirectML GPU result above (slower than CPU on this workload
+# shape), and that NPUs typically need even more batching/sustained load to
+# amortize their overhead than a GPU does, treat NPU wiring as exploratory,
+# not an expected win — re-measure before relying on it.
+
+# Optional — used by the ONNX NPU path if installed in the RAI conda env
+# onnxruntime-genai>=0.16           # for OGA-based LLM inference with Ryzen AI
+
+# NOTE: peft (LoRA/QLoRA) moved to requirements.txt -- it was here only
+# because target_modules used to be hardcoded to Llama/Qwen-style names,
+# which don't exist on gpt2 (this project's default base model), making
+# LoRA effectively AMD/non-default-hardware-only in practice. Fixed by
+# auto-detecting target modules per architecture (src/core/finetune_plan.py)
+# -- LoRA is now a real default-workflow feature, not an accelerator extra.
+
+# NOTE: optimum[onnxruntime] was evaluated for ONNX export and rejected — it
+# pulls transformers down to the 4.x range, which breaks sentence-transformers
+# (RAG) in this project (needs transformers>=5.0), and also wants to install
+# a plain `onnxruntime` that conflicts with `onnxruntime-directml` above.
+# scripts/export_onnx.py uses plain torch.onnx.export instead — needs
+# nothing beyond what's already listed here.
+
+# bitsandbytes (QLoRA, 4-bit) — Windows support is best-effort; install only if you need it
+bitsandbytes>=0.43; platform_system != "Windows"
